@@ -41,19 +41,20 @@ FastaStream& operator>>(FastaStream& stream, MSA& msa)
         throw runtime_error{"FASTA file does not contain equal size sequences"};
     }
 
-    if (!header_length)
-    {
-      throw runtime_error{"FASTA file contains empty sequence label: " + to_string(msa.size() + 1) };
-    }
-
     if (!sequence_length)
     {
       throw runtime_error{"FASTA file contains empty sequence:" + string(header) };
     }
 
-    /* trim trailing whitespace from the sequence label */
+    /* trim leading and trailing whitespace from the sequence label */
     std::string label(header);
     label.erase(label.find_last_not_of(" \n\r\t")+1);
+    label.erase(0, label.find_first_not_of(" \n\r\t"));
+
+    if (label.empty())
+    {
+      throw runtime_error{"FASTA file contains empty sequence label: " + to_string(msa.size() + 1) };
+    }
 
     /* two ways to deal with spaces in headers: */
     if (stream.long_labels())
