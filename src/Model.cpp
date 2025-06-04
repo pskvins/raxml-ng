@@ -11,20 +11,23 @@ const vector<int> ALL_MODEL_PARAMS = {CORAX_OPT_PARAM_FREQUENCIES, CORAX_OPT_PAR
 const unordered_map<DataType,unsigned int,EnumClassHash>  DATATYPE_STATES { {DataType::dna, 4},
                                                                             {DataType::protein, 20},
                                                                             {DataType::binary, 2},
-                                                                            {DataType::genotype10, 10}
+                                                                            {DataType::genotype10, 10},
+                                                                            {DataType::genotype16, 16}
                                                                           };
 
 const unordered_map<DataType,const corax_state_t*,EnumClassHash>  DATATYPE_MAPS {
   {DataType::dna, corax_map_nt},
   {DataType::protein, corax_map_aa},
   {DataType::binary, corax_map_bin},
-  {DataType::genotype10, corax_map_gt10}
+  {DataType::genotype10, corax_map_gt10},
+  {DataType::genotype16, corax_map_gt16}
 };
 
 const unordered_map<DataType,string,EnumClassHash>  DATATYPE_PREFIX { {DataType::dna, "DNA"},
                                                                       {DataType::protein, "PROT"},
                                                                       {DataType::binary, "BIN"},
                                                                       {DataType::genotype10, "GT"},
+                                                                      {DataType::genotype16, "GP"},
                                                                       {DataType::multistate, "MULTI"},
                                                                       {DataType::autodetect, "AUTO"}
                                                                     };
@@ -220,6 +223,8 @@ std::string Model::data_type_name() const
       return "AA";
     case DataType::genotype10:
       return "GT";
+    case DataType::genotype16:
+      return "GP";
     case DataType::multistate:
       return "MULTI" + std::to_string(_num_states);
     case DataType::autodetect:
@@ -233,9 +238,13 @@ void Model::autodetect_data_type(const std::string &model_name)
 {
   if (_data_type == DataType::autodetect)
   {
-    if (corax_util_model_exists_genotype(model_name.c_str()))
+    if (corax_util_model_exists_genotype10(model_name.c_str()))
     {
       _data_type = DataType::genotype10;
+    }
+    else if (corax_util_model_exists_genotype16(model_name.c_str()))
+    {
+      _data_type = DataType::genotype16;
     }
     else if (corax_util_model_exists_mult(model_name.c_str()))
     {
@@ -261,6 +270,8 @@ void Model::autodetect_data_type(const std::string &model_name)
         _data_type = DataType::dna;
       else if (isprefix(model_name, "PROT"))
         _data_type = DataType::protein;
+      else if (isprefix(model_name, "GT16"))
+        _data_type = DataType::genotype16;
       else if (isprefix(model_name, "GT"))
         _data_type = DataType::genotype10;
       else if (isprefix(model_name, "MULTI"))
@@ -298,7 +309,7 @@ corax_mixture_model_t * Model::init_mix_model(const std::string &model_name)
     {
       modinfo =  corax_util_model_create_custom("BIN", 2, NULL, NULL, NULL, NULL);
     }
-    else if (_data_type == DataType::genotype10)
+    else if (_data_type == DataType::genotype10 || _data_type == DataType::genotype16)
     {
       modinfo =  corax_util_model_info_genotype(model_cstr);
     }
