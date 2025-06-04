@@ -10,7 +10,9 @@ set(PLLMOD_DEBUG OFF CACHE BOOL "Debug pll-modules (tons of console output!)")
 
 set (USE_PTHREADS ON CACHE BOOL "Enable multi-threading support (PTHREADS)")
 set (USE_MPI OFF CACHE BOOL "Enable MPI support")
-set (USE_VCF OFF)
+
+set (USE_VCF OFF CACHE BOOL "Enable VCF support")
+set (HTSLIB_DIR "" CACHE STRING "Path to htslib")
 
 # build a static binary
 set(STATIC_BUILD OFF CACHE BOOL "Build static binary")
@@ -106,6 +108,10 @@ endif()
 
 if(USE_TERRAPHAST)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_TERRAPHAST")
+endif()
+
+if(USE_VCF)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_RAXML_VCF")
 endif()
 
 message(STATUS "Using flags: ${CMAKE_CXX_FLAGS}")

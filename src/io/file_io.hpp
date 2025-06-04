@@ -62,6 +62,34 @@ public:
   CATGStream(const std::string& fname) : MSAFileStream(fname) {}
 };
 
+#ifdef _RAXML_VCF
+enum class VCFLikelihoodMode
+{
+  autodetect = -1,
+  none = 0,
+  gl = 1,
+  pl = 2,
+  fpl = 3,
+  g10 = 4,
+  g10n = 5
+};
+
+class VCFStream : public MSAFileStream
+{
+public:
+  VCFStream(const std::string& fname, bool normalized_gl = false,
+            VCFLikelihoodMode likelihood_mode = VCFLikelihoodMode::autodetect) :
+    MSAFileStream(fname), _use_normalized_gl(normalized_gl), _gt_likelihood_mode(likelihood_mode) {}
+
+  bool use_normalized_gl() const { return _use_normalized_gl; }
+  VCFLikelihoodMode gt_likelihood_mode() const { return _gt_likelihood_mode; }
+
+private:
+  bool _use_normalized_gl;
+  VCFLikelihoodMode _gt_likelihood_mode;
+};
+#endif
+
 class RBAStream : public MSAFileStream
 {
 public:
@@ -156,7 +184,12 @@ NewickStream& operator<<(NewickStream& stream, const SupportTree& tree);
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa);
 FastaStream& operator>>(FastaStream& stream, MSA& msa);
 CATGStream& operator>>(CATGStream& stream, MSA& msa);
-MSA msa_load_from_file(const std::string &filename, const FileFormat format);
+
+#ifdef _RAXML_VCF
+VCFStream& operator>>(VCFStream& stream, MSA& msa);
+#endif
+
+MSA msa_load_from_file(const std::string &filename, const FileFormat format, const Options& opts);
 
 PhylipStream& operator<<(PhylipStream& stream, const MSA& msa);
 PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa);

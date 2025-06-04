@@ -23,9 +23,10 @@ MSA::MSA(const corax_msa_t *pll_msa) :
 
 MSA::MSA(MSA&& other) : _length(other._length), _num_sites(other._num_sites),
     _sequences(move(other._sequences)), _labels(move(other._labels)),
-    _label_id_map(move(other._label_id_map)), _weights(move(other._weights)),
-    _probs(move(other._probs)), _local_seq_ranges(move(other._local_seq_ranges)),
-    _states(other._states), _pll_msa(other._pll_msa), _dirty(other._dirty)
+    _label_id_map(move(other._label_id_map)), _site_names(move(other._site_names)),
+    _weights(move(other._weights)), _probs(move(other._probs)),
+    _local_seq_ranges(move(other._local_seq_ranges)), _states(other._states),
+    _pll_msa(other._pll_msa), _dirty(other._dirty)
 {
   other._length = other._num_sites = 0;
   other._pll_msa = nullptr;
@@ -47,6 +48,7 @@ MSA& MSA::operator=(MSA&& other)
     _sequences.clear();
     _labels.clear();
     _label_id_map.clear();
+    _site_names.clear();
 
     // steal other’s resource
     _length = other._length;
@@ -59,6 +61,7 @@ MSA& MSA::operator=(MSA&& other)
     _probs = std::move(other._probs);
     _local_seq_ranges = std::move(other._local_seq_ranges);
     _states = other._states;
+    _site_names = std::move(other._site_names);
     _dirty = other._dirty;
 
     // reset other
@@ -381,4 +384,15 @@ size_t MSA::get_local_offset(size_t global_offset) const
     }
     throw runtime_error("MSA: offset " + to_string(global_offset) + " is outside of local range!");
   }
+}
+
+void MSA::site_name(size_t index, const std::string& name)
+{
+  if (index >= _length)
+    throw out_of_range("Invalid site index: " + to_string(_length));
+
+  if (_site_names.size() < _length)
+    _site_names.resize(_length);
+
+  _site_names[index] = name;
 }

@@ -18,8 +18,16 @@ if(USE_TERRAPHAST)
   set(RAXML_SOURCES ${RAXML_SOURCES} ${TERRACE_SOURCES})
 endif()
 
+if(USE_VCF)
+  find_path(HTSLIB_INCLUDE_DIR NAMES htslib/vcf.h HINTS "${HTSLIB_DIR}/include")
+  set(RAXML_INCLUDES ${HTSLIB_INCLUDE_DIR} ${RAXML_INCLUDES})
+else()
+  list(REMOVE_ITEM RAXML_SOURCES ${PROJECT_SOURCE_DIR}/src/io/VCFStream.cpp)
+endif()
+
 # export to the parent dir to use in GTest makefile
 set(RAXML_SOURCES ${RAXML_SOURCES} PARENT_SCOPE)
+set(RAXML_INCLUDES ${RAXML_INCLUDES} PARENT_SCOPE)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -56,7 +64,7 @@ if (USE_CORAXLIB_CMAKE)
   set(CORAX_LIBS corax)
 endif()
 
-set(RAXML_LIBS ${CORAX_LIBS} m)
+set(RAXML_LIBS ${CORAX_LIBS} m ${RAXML_LIBS})
 
 if(USE_EBG)
   set(RAXML_LIBS ebg ${RAXML_LIBS})
@@ -67,11 +75,19 @@ if(USE_TERRAPHAST)
   target_link_libraries(raxml_module PUBLIC ${RAXML_LIBS})
 endif()
 
+if(USE_VCF)
+  find_library(HTSLIB_LIBRARY NAMES libhts hts HINTS "${HTSLIB_DIR}/lib")
+  find_library(HTSLIB_CODECS NAMES htscodecs HINTS "${HTSLIB_DIR}/lib")
+  set(RAXML_LIBS ${HTSLIB_LIBRARY} ${HTSLIB_CODECS} z lzma bz2 deflate ${RAXML_LIBS})
+endif()
+
 # export to the parent dir to use in GTest makefile
 set(RAXML_LIBS ${RAXML_LIBS} PARENT_SCOPE)
 
 message(STATUS "Libs: ${RAXML_LIBS}")
+message(STATUS "Includes: ${RAXML_INCLUDES}")
 
+target_include_directories(raxml_module PRIVATE ${RAXML_INCLUDES})
 target_link_libraries(raxml_module PUBLIC ${RAXML_LIBS})
 
 if (BUILD_AS_LIBRARY AND NOT APPLE)

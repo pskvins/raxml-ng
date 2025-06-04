@@ -1167,7 +1167,7 @@ void load_msa(RaxmlInstance& instance)
   LOG_INFO_TS << "Reading alignment from file: " << opts.msa_file << endl;
 
   /* load MSA */
-  auto msa = msa_load_from_file(opts.msa_file, opts.msa_format);
+  auto msa = msa_load_from_file(opts.msa_file, opts.msa_format, opts);
   
   if (!msa.size())
     throw runtime_error("Alignment file is empty!");
@@ -1181,6 +1181,8 @@ void load_msa(RaxmlInstance& instance)
     instance.opts.use_tip_inner = false;
     instance.opts.use_repeats = false;
     instance.opts.use_pythia = false;
+    instance.opts.safety_checks.unset(SafetyCheck::msa_dups);
+    instance.opts.safety_checks.unset(SafetyCheck::msa_allgaps);
 
     if (parted_msa.part_count() > 1)
       throw runtime_error("Partitioned probabilistic alignments are not supported yet, sorry...");

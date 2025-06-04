@@ -22,7 +22,7 @@ struct SNVRecord
 
   unsigned int al_count;
   int al_names[4];
-  pll_state_t al_states[4];
+  corax_state_t al_states[4];
 
   unsigned int pl_per_sample;
   int pl_d10_map[10];
@@ -122,10 +122,10 @@ static void set_sample_names(MSA& msa, bcf_hdr_t * hdr)
 
 static void init_maps()
 {
-  char inv_charmap[PLL_ASCII_SIZE] = {0};
-  for (unsigned int i = 0; i < PLL_ASCII_SIZE; ++i)
-    if (pll_map_nt[i] && !inv_charmap[pll_map_nt[i]])
-      inv_charmap[pll_map_nt[i]] = (char)i;
+  char inv_charmap[CORAX_ASCII_SIZE] = {0};
+  for (unsigned int i = 0; i < CORAX_ASCII_SIZE; ++i)
+    if (corax_map_nt[i] && !inv_charmap[corax_map_nt[i]])
+      inv_charmap[corax_map_nt[i]] = (char)i;
 
   for (size_t i = 0; i < 4; ++i)
   {
@@ -166,9 +166,9 @@ static void init_pl_d10_map(SNVRecord& snv)
   {
     for (k = 0; k <= i; ++k)
     {
-      int c1 = PLL_STATE_CTZ(snv.al_states[k]);
-      int c2 = PLL_STATE_CTZ(snv.al_states[i]);
-      int d10 = PLL_STATE_CTZ(pll_map_gt10[(int) gt10_to_char[c1][c2]]);
+      int c1 = CORAX_STATE_CTZ(snv.al_states[k]);
+      int c2 = CORAX_STATE_CTZ(snv.al_states[i]);
+      int d10 = CORAX_STATE_CTZ(corax_map_gt10[(int) gt10_to_char[c1][c2]]);
       snv.pl_d10_map[g++] = d10;
 #ifdef _RAXML_VCF_DEBUG
       printf("%s ", gt_inv_map[d10]);
@@ -213,7 +213,7 @@ static void read_snv_fixed(SNVRecord& snv, bcf_hdr_t * hdr, bcf1_t * rec)
   for (i = 0; i < 4; ++i)
     snv.al_states[i] = 0;
   for (i = 0; i < snv.al_count; ++i)
-    snv.al_states[i] = pll_map_nt[snv.al_names[i]];
+    snv.al_states[i] = corax_map_nt[snv.al_names[i]];
 
   /* sanity-check alleles */
   for (i = 0; i < snv.al_count-1; ++i)
@@ -466,8 +466,8 @@ void set_sample_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id,
 //  int phased2 = bcf_gt_is_phased(snv.sample_gt->p[sample_id * 2 + 1]);
 //  printf("phased: %d \n", phased2);
 
-  auto gt1 = PLL_STATE_CTZ(snv.al_states[al1]);
-  auto gt2 = PLL_STATE_CTZ(snv.al_states[al2]);
+  auto gt1 = CORAX_STATE_CTZ(snv.al_states[al1]);
+  auto gt2 = CORAX_STATE_CTZ(snv.al_states[al2]);
 
   char c = '-';
   if (al1 >= 0 && al2 >= 0)
@@ -497,8 +497,8 @@ void set_sample_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id,
       case VCFLikelihoodMode::none:
       {
         // no uncertainty specified, called genotype gets likelihood 1.0
-        pll_state_t ml_state =  pll_map_gt10[(int) c];
-        pll_state_t state = 1;
+        corax_state_t ml_state =  corax_map_gt10[(int) c];
+        corax_state_t state = 1;
         for (unsigned int k = 0; k < 10; ++k, state <<= 1)
           site_probs[k] = (state & ml_state) ? 1.0 : 0.0;
       }
@@ -616,7 +616,7 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
   if ( (ret = hts_close(fp)) )
     throw runtime_error("hts_close() returned non-zero status: " + to_string(ret));
 
-//  pllmod_msa_save_phylip(msa.pll_msa(), "vcfout.phy");
+//  pllmod_msa_save_phylip(msa.corax_msa(), "vcfout.phy");
 
   return stream;
 }

@@ -3,6 +3,7 @@
 #include <map>
 
 #include "file_io.hpp"
+#include "../Options.hpp"
 
 using namespace std;
 
@@ -287,7 +288,7 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
   return stream;
 }
 
-MSA msa_load_from_file(const std::string &filename, const FileFormat format)
+MSA msa_load_from_file(const std::string &filename, const FileFormat format, const Options& opts)
 {
   MSA msa;
 
@@ -353,6 +354,22 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format)
           CATGStream s(filename);
           s >> msa;
           return msa;
+          break;
+        }
+        case FileFormat::vcf:
+        {
+#ifdef _RAXML_VCF
+          auto vcf_lh_mode = opts.use_prob_msa ?
+                             VCFLikelihoodMode::autodetect : VCFLikelihoodMode::none;
+          bool normalized_gl = false;  // opts.vcf_normalized_gl
+          VCFStream s(filename, normalized_gl, vcf_lh_mode);
+          s >> msa;
+          return msa;
+#else
+          RAXML_UNUSED(opts);
+          if (format != FileFormat::autodetect)
+            throw runtime_error("RAxML-NG was built without VCF support!");
+#endif
           break;
         }
         default:
