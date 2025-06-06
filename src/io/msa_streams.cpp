@@ -288,38 +288,70 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
   return stream;
 }
 
-MSA msa_load_from_file(const std::string &filename, const FileFormat format, const Options& opts)
+FileFormat msa_detect_file_format(const std::string &filename)
+{
+  map<FileFormat, string> msa_magic = { {FileFormat::fasta, ">"},
+                                        {FileFormat::vcf, "##fileformat=VCF"} };
+
+  ifstream fs(filename);
+
+  string s;
+  while (s.empty())
+  {
+    fs >> std::skipws >> s;
+    for (auto& m: msa_magic)
+    {
+      if (s.compare(0, m.second.size(), m.second) == 0)
+        return m.first;
+    }
+  }
+
+  // failed to detect format so far, will try later
+  return FileFormat::autodetect;
+}
+
+
+MSA msa_load_from_file(const std::string &filename, FileFormat format, const Options& opts)
 {
   MSA msa;
+  string parser_error;
+  vector<FileFormat> fmt_list;
 
-  typedef pair<FileFormat, string> FormatNamePair;
-  static vector<FormatNamePair> msa_formats = { {FileFormat::iphylip, "IPHYLIP"},
-                                                {FileFormat::phylip, "PHYLIP"},
-                                                {FileFormat::fasta, "FASTA"},
-                                                {FileFormat::fasta_longlabels, "FASTA (long labels)"},
-                                                {FileFormat::catg, "CATG"},
-                                                {FileFormat::vcf, "VCF"},
-                                                {FileFormat::binary, "RAxML-binary"} };
+  static map<FileFormat, string> msa_formats = { {FileFormat::iphylip, "IPHYLIP"},
+                                                 {FileFormat::phylip, "PHYLIP"},
+                                                 {FileFormat::catg, "CATG"},
+                                                 {FileFormat::fasta, "FASTA"},
+                                                 {FileFormat::fasta_longlabels, "FASTA (long labels)"},
+                                                 {FileFormat::vcf, "VCF"},
+                                                 {FileFormat::binary, "RAxML-binary"} };
 
-  auto fmt_begin = msa_formats.cbegin();
-  auto fmt_end = msa_formats.cend();
+
 
   if (!sysutil_file_exists(filename))
     throw runtime_error("File not found: " + filename);
 
+  // first quick&dirty attempt to guess file format
+  if (format == FileFormat::autodetect)
+    format = msa_detect_file_format(filename);
+
   if (format != FileFormat::autodetect)
   {
-    fmt_begin = std::find_if(msa_formats.begin(), msa_formats.end(),
-                             [format](const FormatNamePair& p) { return p.first == format; });
-    assert(fmt_begin != msa_formats.cend());
-    fmt_end = fmt_begin + 1;
+    fmt_list.push_back(format);
+  }
+  else
+  {
+    // PHYLIP-based formats are so bad that we can only rely on trial&error ...
+    fmt_list.push_back(FileFormat::iphylip);
+    fmt_list.push_back(FileFormat::phylip);
+    fmt_list.push_back(FileFormat::catg);
   }
 
-  for (; fmt_begin != fmt_end; fmt_begin++)
+  // if quick format autodetection failed, we will iterate over all available MSA parsers
+  for (auto fmt = fmt_list.cbegin(); fmt != fmt_list.cend(); fmt++)
   {
     try
     {
-      switch (fmt_begin->first)
+      switch (*fmt)
       {
         case FileFormat::fasta:
         {
@@ -379,15 +411,16 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format, con
     catch(exception &e)
     {
       libpll_reset_error();
+      parser_error = string(e.what());
       if (format == FileFormat::autodetect)
-        LOG_DEBUG << "Failed to load as " << fmt_begin->second << ": " << e.what() << endl;
+        LOG_DEBUG << "Failed to load as " << msa_formats.at(*fmt) << ": " << parser_error << endl;
       else
-        throw runtime_error("Error loading MSA: " + string(e.what()));
+        throw runtime_error("Error loading MSA: " + parser_error);
     }
   }
 
   throw runtime_error("Error loading MSA: cannot parse any format supported by RAxML-NG!\n"
-      "Please re-run with --msa-format <FORMAT> and/or --log debug to get more information.");
+      "Please re-run with --msa-format <FORMAT> and/or --log debug to get more information.\n");
 }
 
 

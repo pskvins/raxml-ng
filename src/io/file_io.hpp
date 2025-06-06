@@ -189,7 +189,7 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa);
 VCFStream& operator>>(VCFStream& stream, MSA& msa);
 #endif
 
-MSA msa_load_from_file(const std::string &filename, const FileFormat format, const Options& opts);
+MSA msa_load_from_file(const std::string &filename, FileFormat format, const Options& opts);
 
 PhylipStream& operator<<(PhylipStream& stream, const MSA& msa);
 PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa);
