@@ -36,7 +36,7 @@ build-mpi/
 build-static/
 release/
 
-# Eclipse project files
+# IDE project files
 .cproject
 .project
 .settings/
@@ -50,3 +50,5 @@ release/
 
 # TODO file
 todo.txt
+.vscode
+.devcontainer
