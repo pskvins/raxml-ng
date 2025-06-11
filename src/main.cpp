@@ -945,6 +945,25 @@ void check_options(RaxmlInstance& instance)
     }
   }
 
+  /* auto-enable rate scalers for >2000 taxa */
+  if (opts.safety_checks.isset(SafetyCheck::model_rate_scalers))
+  {
+    if (instance.parted_msa->taxon_count() > RAXML_RATESCALERS_TAXA &&
+        !instance.opts.use_rate_scalers)
+    {
+      LOG_INFO << "\nNOTE: Per-rate scalers were automatically enabled to prevent numerical issues "
+          "on taxa-rich alignments." << endl;
+      LOG_INFO << "NOTE: You can use --force switch to skip this check "
+          "and fall back to per-site scalers." << endl << endl;
+      instance.opts.use_rate_scalers = true;
+    }
+  }
+}
+
+void check_options_perf(RaxmlInstance& instance)
+{
+  const auto& opts = instance.opts;
+
   /* check that we have enough patterns per thread */
   if (opts.safety_checks.isset(SafetyCheck::perf_threads))
   {
@@ -978,22 +997,8 @@ void check_options(RaxmlInstance& instance)
     }
   }
 
-  /* auto-enable rate scalers for >2000 taxa */
-  if (opts.safety_checks.isset(SafetyCheck::model_rate_scalers))
-  {
-    if (instance.parted_msa->taxon_count() > RAXML_RATESCALERS_TAXA &&
-        !instance.opts.use_rate_scalers)
-    {
-      LOG_INFO << "\nNOTE: Per-rate scalers were automatically enabled to prevent numerical issues "
-          "on taxa-rich alignments." << endl;
-      LOG_INFO << "NOTE: You can use --force switch to skip this check "
-          "and fall back to per-site scalers." << endl << endl;
-      instance.opts.use_rate_scalers = true;
-    }
-  }
-
   /* make sure we do not check for convergence too often in coarse-grained parallelization mode */
-  instance.opts.bootstop_interval = std::max(opts.bootstop_interval, opts.num_workers*2);
+  instance.opts.bootstop_interval = std::max(opts.bootstop_interval, opts.num_workers * 2);
 }
 
 void check_oversubscribe(RaxmlInstance& instance)
@@ -3645,8 +3650,6 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   load_constraint(instance);
 
-  autotune_threads(instance);
-
   check_options(instance);
 
   /* init template tree */
@@ -3679,6 +3682,10 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
       load_start_trees(instance);
     }
   }
+
+  autotune_threads(instance);
+
+  check_options_perf(instance);
 
   // TEMP WORKAROUND: here we reset random seed once again to make sure that BS replicates
   // are not affected by the number of ML search starting trees that has been generated before
