@@ -876,8 +876,8 @@ void Model::init_model_opts(const std::string &model_opts, const pllmod_mixture_
       break;
     case ParamValue::ML:
       for (auto& m: _submodels)
-        m.subst_rates(doubleVector(m.num_rates(), 1.0));
-//        m.subst_rates(doubleVector({0.5, 0.5, 0.5, 0.5, 0.5, 1.0 }));
+//        m.subst_rates(doubleVector(m.num_rates(), 1.0));
+        m.uniq_subst_rates(doubleVector(m.num_uniq_rates(), 1.0));
       break;
     case ParamValue::equal:
       /* use equal rates as s a starting value for ML optimization */

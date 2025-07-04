@@ -41,6 +41,11 @@ else()
   add_executable(raxml_module ${RAXML_SOURCES})
 endif()
 
+if(STATIC_BUILD)
+  SET_TARGET_PROPERTIES(raxml_module PROPERTIES LINK_SEARCH_START_STATIC 1)
+endif()
+
+
 
 if (USE_LIBPLL_CMAKE)
   target_include_directories(raxml_module PRIVATE ${PLLMOD_EXPORTED_INCLUDE_PATH})
@@ -66,10 +71,9 @@ endif()
 
 if(USE_VCF)
   find_path(HTSLIB_INCLUDE_DIR NAMES htslib/vcf.h HINTS "${HTSLIB_DIR}/include")
-  find_library(HTSLIB_LIBRARY NAMES libhts.a hts HINTS "${HTSLIB_DIR}/lib")
-  find_library(HTSLIB_LZMA NAMES lzma)
-  find_library(HTSLIB_BZ2 NAMES bz2)
-  set(RAXML_LIBS ${HTSLIB_LIBRARY} z ${HTSLIB_LZMA} ${HTSLIB_BZ2} ${RAXML_LIBS})
+  find_library(HTSLIB_LIBRARY NAMES libhts hts HINTS "${HTSLIB_DIR}/lib")
+  find_library(HTSLIB_CODECS NAMES htscodecs HINTS "${HTSLIB_DIR}/lib")
+  set(RAXML_LIBS ${HTSLIB_LIBRARY} ${HTSLIB_CODECS} z lzma bz2 deflate ${RAXML_LIBS})
   set(RAXML_INCLUDES ${HTSLIB_INCLUDE_DIR} ${RAXML_INCLUDES})
 endif()
 
@@ -81,18 +85,18 @@ message(STATUS "Libs: ${RAXML_LIBS}")
 message(STATUS "Includes: ${RAXML_INCLUDES}")
 
 target_include_directories(raxml_module PRIVATE ${RAXML_INCLUDES})
-target_link_libraries(raxml_module ${RAXML_LIBS})
+target_link_libraries(raxml_module PUBLIC ${RAXML_LIBS})
 
 if (BUILD_AS_LIBRARY AND NOT APPLE)
-  target_link_libraries(raxml_module gcc_s gcc)
+  target_link_libraries(raxml_module PUBLIC gcc_s gcc)
 endif()
 
 if(GMP_FOUND)
-  target_link_libraries(raxml_module ${GMP_LIBRARIES})
+  target_link_libraries(raxml_module PUBLIC ${GMP_LIBRARIES})
 endif()
 
 if(MPI_FOUND)
-  target_link_libraries(raxml_module ${MPI_CXX_LIBRARIES})
+  target_link_libraries(raxml_module PUBLIC ${MPI_CXX_LIBRARIES})
 endif()
 
 if(MPI_COMPILE_FLAGS)

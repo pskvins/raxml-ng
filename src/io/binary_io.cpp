@@ -240,7 +240,7 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, TreeTopology& t)
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeCollection& c)
 {
   stream << c.size();
-  for (const auto tree: c)
+  for (const auto& tree: c)
     stream << tree.first << tree.second;
   return stream;
 }

@@ -24,16 +24,16 @@ struct PartitionStats
   PartitionStats() : site_count(0), pattern_count(0), inv_prop(0.), gap_prop(0.), gap_seqs(),
       emp_base_freqs(), emp_subst_rates() {}
 
-//  void swap(PartitionStats& first, PartitionStats& second)
-//  {
-//    std::swap(first.site_count, second.site_count);
-//    std::swap(first.pattern_count, second.pattern_count);
-//    std::swap(first.inv_prop, second.inv_prop);
-//    std::swap(first.gap_prop, second.gap_prop);
-//    std::swap(first.gap_seqs, second.gap_seqs);
-//    std::swap(first.emp_base_freqs, second.emp_base_freqs);
-//    std::swap(first.emp_subst_rates, second.emp_subst_rates);
-//  }
+  friend void swap(PartitionStats& first, PartitionStats& second)
+  {
+    std::swap(first.site_count, second.site_count);
+    std::swap(first.pattern_count, second.pattern_count);
+    std::swap(first.inv_prop, second.inv_prop);
+    std::swap(first.gap_prop, second.gap_prop);
+    std::swap(first.gap_seqs, second.gap_seqs);
+    std::swap(first.emp_base_freqs, second.emp_base_freqs);
+    std::swap(first.emp_subst_rates, second.emp_subst_rates);
+  }
 
   PartitionStats(const PartitionStats& other) : site_count(other.site_count),
       pattern_count(other.pattern_count),
@@ -45,11 +45,11 @@ struct PartitionStats
 //    swap(*this, other);
 //  }
 
-//  PartitionStats& operator=(PartitionStats other)
-//  {
-//    std::swap(*this, other);
-//    return *this;
-//  }
+  PartitionStats& operator=(PartitionStats other)
+  {
+    std::swap(*this, other);
+    return *this;
+  }
 };
 
 class PartitionInfo

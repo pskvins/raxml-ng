@@ -47,7 +47,10 @@ public:
     {
       doubleVector uniq_rates(num_uniq_rates());
       for (size_t i = 0; i < _subst_rates.size(); ++i)
-        uniq_rates[_rate_sym[i]] = _subst_rates[i];
+      {
+        if (_rate_sym[i] >= 0)
+          uniq_rates[_rate_sym[i]] = _subst_rates[i];
+      }
       return uniq_rates;
     }
     else
@@ -82,7 +85,7 @@ public:
 
       _subst_rates.resize(num_rates());
       for (size_t i = 0; i < _subst_rates.size(); ++i)
-        _subst_rates[i] = v[_rate_sym[i]];
+        _subst_rates[i] = _rate_sym[i] < 0 ? PLLMOD_OPT_MIN_SUBST_RATE : v[_rate_sym[i]];
     }
     else
       subst_rates(v);

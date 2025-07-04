@@ -547,7 +547,10 @@ double TreeInfo::spr_round(spr_round_params& params)
                                _brlen_min, _brlen_max, RAXML_BRLEN_SMOOTHINGS,
                                0.1,
                                params.subtree_cutoff > 0. ? &params.cutoff_info : nullptr,
-                               params.subtree_cutoff);
+                               params.subtree_cutoff,
+                               0.1,
+                               PLL_TRUE
+                               );
 
   libpll_check_error("ERROR in SPR round");
 
@@ -560,7 +563,8 @@ void TreeInfo::set_topology_constraint(const Tree& cons_tree)
 {
   if (!cons_tree.empty())
   {
-    int retval = pllmod_treeinfo_set_constraint_tree(_pll_treeinfo, &cons_tree.pll_utree());
+    int retval = pllmod_treeinfo_set_constraint_tree(_pll_treeinfo, &cons_tree.pll_utree(), 
+                                                     PLL_FALSE);
     if (!retval)
       libpll_check_error("ERROR: Cannot set topological constraint");
   }
