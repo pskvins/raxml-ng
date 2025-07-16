@@ -3662,6 +3662,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
       instance.opts.num_searches > 0 &&
       !(instance.opts.constraint_tree_file.empty() && instance.opts.use_old_constraint))
   {
+    LOG_INFO << endl << "NOTE: Loading existing starting trees from file: "
+             << instance.opts.start_tree_file() << endl << endl;
     load_start_trees(instance);
   }
 
