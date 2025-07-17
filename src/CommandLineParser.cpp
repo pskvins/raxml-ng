@@ -1055,6 +1055,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_pythia = true;
             else if (eopt == "pythia-off")
               opts.use_pythia = false;
+            else if (eopt == "brlen-reset")
+              opts.brlen_reset_usertree = true;
+            else if (eopt == "brlen-keep")
+              opts.brlen_reset_usertree = false;
             else if (eopt == "compat-v11")
             {
               compat_ver = 110;

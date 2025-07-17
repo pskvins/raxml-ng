@@ -1350,6 +1350,9 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type, int random_
       LOG_DEBUG << "Loaded user starting tree with " << tree.num_tips() << " taxa from: "
                            << opts.tree_file << endl;
 
+      if (opts.brlen_reset_usertree)
+        tree.reset_brlens();
+
       check_tree(parted_msa, tree, true);
 
       if (!instance.constraint_tree.empty())
@@ -1417,6 +1420,9 @@ void load_start_trees(RaxmlInstance& instance)
     Tree tree;
     ts >> tree;
     i++;
+
+    if (instance.opts.brlen_reset_usertree)
+      tree.reset_brlens();
 
     prepare_tree(instance, tree);
     instance.start_trees.emplace_back(tree);

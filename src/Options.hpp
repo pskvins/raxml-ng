@@ -97,6 +97,7 @@ public:
   int brlen_opt_method;
   double brlen_min;
   double brlen_max;
+  bool brlen_reset_usertree;
 
   unsigned int num_searches;
   unsigned long long terrace_maxsize;
