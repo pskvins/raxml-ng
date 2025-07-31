@@ -22,7 +22,7 @@ void DifficultyPredictor::compute_msa_features(ParsimonyMSA* _pmsa)
   _features                    = (corax_msa_features *) calloc(1, sizeof(corax_msa_features));
   _features->taxa              = part_msa.taxon_count();
   _features->sites             = part_msa.total_sites();
-  _features->sites_per_taxa    = _features->sites / _features->taxa;
+  _features->sites_per_taxa    = (double) _features->sites / _features->taxa;
   _features->patterns          = part_msa.total_patterns();
   _features->patterns_per_taxa = (double) _features->patterns / _features->taxa;
   _features->patterns_per_site = (double) _features->patterns / _features->sites;
@@ -40,7 +40,7 @@ void DifficultyPredictor::compute_msa_features(ParsimonyMSA* _pmsa)
   {
     auto& msa_stats = pinfo.stats();
     size_t cur_num_sites = msa_stats.site_count;
-    double part_prop = cur_num_sites / _features->sites;
+    double part_prop = (double) cur_num_sites / _features->sites;
 
     assert(pinfo.length() == pinfo.msa().weights().size());
 
