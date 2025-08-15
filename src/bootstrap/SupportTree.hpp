@@ -26,4 +26,14 @@ protected:
   doubleVector _support;
 };
 
+class SupportTreeException : public RaxmlException
+{
+  using RaxmlException::RaxmlException;
+};
+
+class InvalidReplicateTreeException : public SupportTreeException
+{
+  using SupportTreeException::SupportTreeException;
+};
+
 #endif /* SRC_BOOTSTRAP_SUPPORTTREE_HPP_ */

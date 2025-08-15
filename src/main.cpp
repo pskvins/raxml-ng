@@ -49,6 +49,7 @@
 #include "bootstrap/EbgSupportTree.hpp"
 #include "bootstrap/ShSupportTree.hpp"
 #include "bootstrap/IcSupportTree.hpp"
+#include "bootstrap/GCFSupportTree.hpp"
 #include "bootstrap/ConsensusTree.hpp"
 #include "autotune/ResourceEstimator.hpp"
 #include "ICScoreCalculator.hpp"
@@ -2173,8 +2174,147 @@ void postprocess_tree(const Options& opts, Tree& tree)
   // TODO: regraft previously removed duplicate seqs etc.
 }
 
+unsigned int read_newick_trees_custom(SplitsTree& ref_tree, const std::string& fname,
+                                      const std::string& tree_kind, bool extract_splits,
+                                      bool require_binary, bool require_complete,
+                                      std::function<bool(const Tree&)> process_tree)
+{
+  NameIdMap ref_tip_ids;
+  unsigned int bs_num = 0;
+
+  if (!sysutil_file_exists(fname))
+    throw runtime_error("File not found: " + fname);
+
+  NewickStream boots(fname, std::ios::in);
+  auto tree_kind_cap = tree_kind;
+  tree_kind_cap[0] = toupper(tree_kind_cap[0]);
+
+  LOG_INFO << "Reading " << tree_kind << " trees from file: " << fname << endl;
+
+  while (boots.peek() != EOF)
+  {
+    Tree tree;
+    boots >> tree;
+
+    if (!bs_num)
+    {
+      if (ref_tree.empty())
+        ref_tree = SplitsTree(tree);
+      ref_tip_ids = ref_tree.tip_ids();
+    }
+
+    assert(!ref_tip_ids.empty());
+
+    if (require_complete && tree.num_tips() != ref_tree.num_tips())
+    {
+      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
+                          " contains wrong number of tips: " + to_string(tree.num_tips()) +
+                          " (expected: " + to_string(ref_tree.num_tips()) + ")");
+    }
+
+    if (require_binary && !tree.binary())
+    {
+      LOG_DEBUG << "REF #branches: " << ref_tree.num_branches()
+                << ", BS #branches: " << tree.num_branches() << endl;
+      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
+                          " contains multifurcations!");
+    }
+
+    try
+    {
+      if (require_complete)
+        tree.reset_tip_ids(ref_tip_ids);
+    }
+    catch (out_of_range& e)
+    {
+      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
+                          " contains incompatible taxon name(s)!");
+    }
+    catch (invalid_argument& e)
+    {
+      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
+                          " has wrong number of tips: " + to_string(tree.num_tips()));
+    }
+
+    process_tree(tree);
+    if (extract_splits)
+    {
+      assert(!ref_tree.empty());
+      ref_tree.add_replicate_tree(tree);
+    }
+    bs_num++;
+  }
+
+  LOG_INFO << "Loaded " << bs_num << " trees with "
+           << ref_tree.num_tips() << " taxa." << endl << endl;
+
+  return bs_num;
+}
+
+TreeTopologyList read_newick_trees(SplitsTree& ref_tree, const std::string& fname,
+                                   const std::string& tree_kind,
+                                   bool extract_splits = false, bool require_binary = true,
+                                   bool require_complete = true)
+{
+  TreeTopologyList trees;
+
+  auto add_topology_to_list = [&trees](const Tree& tree) -> bool
+      { trees.push_back(tree.topology()); return true; };
+
+  read_newick_trees_custom(ref_tree, fname, tree_kind, extract_splits, require_binary,
+                           require_complete, add_topology_to_list);
+
+  return trees;
+}
+
+unsigned int read_newick_trees_to_list(TreeList& tree_list, SplitsTree& ref_tree, const std::string& fname,
+                                   const std::string& tree_kind,
+                                   bool extract_splits = false, bool require_binary = true,
+                                   bool require_complete = true)
+{
+  auto add_tree_to_list = [&tree_list](const Tree& tree) -> bool
+      { tree_list.push_back(tree); return true; };
+
+  return read_newick_trees_custom(ref_tree, fname, tree_kind, extract_splits, require_binary,
+                                  require_complete, add_tree_to_list);
+}
+
+TreeTopologyList read_bootstrap_trees(const RaxmlInstance& instance, SplitsTree& ref_tree,
+                                      bool extract_splits = false, bool require_binary = true)
+{
+  auto bs_trees = read_newick_trees(ref_tree, instance.opts.bootstrap_trees_file(),
+                                    "bootstrap", extract_splits, require_binary);
+
+  if (bs_trees.size() < 2)
+  {
+    throw runtime_error("You must provide a file with multiple bootstrap trees!");
+  }
+
+  return bs_trees;
+}
+
+void read_multiple_tree_files(RaxmlInstance& instance,
+                              bool extract_splits = false, bool require_binary = true)
+{
+  const auto& opts = instance.opts;
+
+  vector<string> fname_list;
+  if (sysutil_file_exists(opts.tree_file))
+    fname_list.push_back(opts.tree_file);
+  else
+    fname_list = split_string(opts.tree_file, ',');
+
+  SplitsTree ref_tree;
+  for (const auto& fname: fname_list)
+  {
+     read_newick_trees_to_list(instance.start_trees, ref_tree, fname, "input",
+                               extract_splits, require_binary);
+  }
+}
+
 void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
-                            const TreeTopologyList& bs_trees, SplitsTree& bs_splits)
+                            const TreeTopologyList& bs_trees, const SplitsTree& bs_splits,
+                            bool require_binary = false)
 {
   reroot_tree_with_outgroup(instance.opts, ref_tree, false);
 
@@ -2183,6 +2323,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
       shared_ptr<SupportTree> sup_tree;
       bool support_in_pct = false;
       bool add_replicate_trees = false;
+      bool require_complete = true;
 
       if (metric == BranchSupportMetric::fbp || metric == BranchSupportMetric::rbs)
       {
@@ -2237,6 +2378,13 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
         add_replicate_trees = true;
         support_in_pct = false;
       }
+      else if (metric == BranchSupportMetric::gcf)
+      {
+        sup_tree = make_shared<GCFSupportTree>(ref_tree);
+        add_replicate_trees = true;
+        support_in_pct = true;
+        require_complete = false;
+      }
       else
         assert(0);
 
@@ -2249,7 +2397,7 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
         {
           sup_tree->add_splits(bs_splits);
         }
-        else
+        else if (!bs_trees.empty())
         {
           Tree tree = ref_tree;
           for (auto& bs: bs_trees)
@@ -2257,6 +2405,30 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
             tree.topology(bs);
             sup_tree->add_replicate_tree(tree);
           }
+        }
+        else
+        {
+          assert(instance.opts.use_tree_streaming);
+
+          size_t treenum = 0;
+          auto add_replicate_tree = [&sup_tree,&treenum](const Tree& tree) -> bool
+              {
+                ++treenum;
+                LOG_DEBUG << "Loaded tree # " << treenum << " with " << tree.num_tips() <<  " taxa" << endl;
+                try
+                {
+                  sup_tree->add_replicate_tree(tree);
+                }
+                catch(SupportTreeException& e)
+                {
+                  throw runtime_error(string("Error in replicate tree # ") + to_string(treenum) +
+                      (e.what() ? ":\n" + string(e.what()) : ""));
+                }
+                return true;
+              };
+
+          read_newick_trees_custom(*sup_tree, instance.opts.bootstrap_trees_file(), "replicate",
+                                   false, require_binary, require_complete, add_replicate_tree);
         }
       }
       sup_tree->draw_support(support_in_pct);
@@ -2275,10 +2447,17 @@ void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
 }
 
 void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
-                            SplitsTree& bs_splits)
+                            const SplitsTree& bs_splits)
 {
   draw_bootstrap_support(instance, ref_tree, TreeTopologyList(), bs_splits);
 }
+
+void draw_bootstrap_support(RaxmlInstance& instance, Tree& ref_tree,
+                            bool require_binary)
+{
+  draw_bootstrap_support(instance, ref_tree, TreeTopologyList(), SplitsTree(), require_binary);
+}
+
 
 bool check_bootstop(const RaxmlInstance& instance, const TreeTopologyList& bs_trees,
                     bool print = false)
@@ -2345,140 +2524,6 @@ bool check_bootstop(const RaxmlInstance& instance, const TreeTopologyList& bs_tr
   return converged;
 }
 
-unsigned int read_newick_trees_custom(SplitsTree& ref_tree, const std::string& fname,
-                                      const std::string& tree_kind,
-                                      bool extract_splits, bool require_binary,
-                                      std::function<bool(const Tree&)> process_tree)
-{
-  NameIdMap ref_tip_ids;
-  unsigned int bs_num = 0;
-
-  if (!sysutil_file_exists(fname))
-    throw runtime_error("File not found: " + fname);
-
-  NewickStream boots(fname, std::ios::in);
-  auto tree_kind_cap = tree_kind;
-  tree_kind_cap[0] = toupper(tree_kind_cap[0]);
-
-  LOG_INFO << "Reading " << tree_kind << " trees from file: " << fname << endl;
-
-  while (boots.peek() != EOF)
-  {
-    Tree tree;
-    boots >> tree;
-
-    if (!bs_num)
-    {
-      if (ref_tree.empty())
-        ref_tree = SplitsTree(tree);
-      ref_tip_ids = ref_tree.tip_ids();
-    }
-
-    assert(!ref_tip_ids.empty());
-
-    if (tree.num_tips() != ref_tree.num_tips())
-    {
-      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
-                          " contains wrong number of tips: " + to_string(tree.num_tips()) +
-                          " (expected: " + to_string(ref_tree.num_tips()) + ")");
-    }
-
-    if (require_binary && !tree.binary())
-    {
-      LOG_DEBUG << "REF #branches: " << ref_tree.num_branches()
-                << ", BS #branches: " << tree.num_branches() << endl;
-      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
-                          " contains multifurcations!");
-    }
-
-    try
-    {
-      tree.reset_tip_ids(ref_tip_ids);
-    }
-    catch (out_of_range& e)
-    {
-      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
-                          " contains incompatible taxon name(s)!");
-    }
-    catch (invalid_argument& e)
-    {
-      throw runtime_error(tree_kind_cap + " tree #" + to_string(bs_num+1) +
-                          " has wrong number of tips: " + to_string(tree.num_tips()));
-    }
-
-    process_tree(tree);
-    if (extract_splits)
-    {
-      assert(!ref_tree.empty());
-      ref_tree.add_replicate_tree(tree);
-    }
-    bs_num++;
-  }
-
-  LOG_INFO << "Loaded " << bs_num << " trees with "
-           << ref_tree.num_tips() << " taxa." << endl << endl;
-
-  return bs_num;
-}
-
-TreeTopologyList read_newick_trees(SplitsTree& ref_tree, const std::string& fname,
-                                   const std::string& tree_kind,
-                                   bool extract_splits = false, bool require_binary = true)
-{
-  TreeTopologyList trees;
-
-  auto add_topology_to_list = [&trees](const Tree& tree) -> bool
-      { trees.push_back(tree.topology()); return true; };
-
-  read_newick_trees_custom(ref_tree, fname, tree_kind, extract_splits, require_binary,
-                           add_topology_to_list);
-
-  return trees;
-}
-
-unsigned int read_newick_trees_to_list(TreeList& tree_list, SplitsTree& ref_tree, const std::string& fname,
-                                   const std::string& tree_kind,
-                                   bool extract_splits = false, bool require_binary = true)
-{
-  auto add_tree_to_list = [&tree_list](const Tree& tree) -> bool
-      { tree_list.push_back(tree); return true; };
-
-  return read_newick_trees_custom(ref_tree, fname, tree_kind, extract_splits, require_binary,
-                                  add_tree_to_list);
-}
-
-TreeTopologyList read_bootstrap_trees(const RaxmlInstance& instance, SplitsTree& ref_tree,
-                                      bool extract_splits = false, bool require_binary = true)
-{
-  auto bs_trees = read_newick_trees(ref_tree, instance.opts.bootstrap_trees_file(),
-                                    "bootstrap", extract_splits, require_binary);
-
-  if (bs_trees.size() < 2)
-  {
-    throw runtime_error("You must provide a file with multiple bootstrap trees!");
-  }
-
-  return bs_trees;
-}
-
-void read_multiple_tree_files(RaxmlInstance& instance,
-                              bool extract_splits = false, bool require_binary = true)
-{
-  const auto& opts = instance.opts;
-
-  vector<string> fname_list;
-  if (sysutil_file_exists(opts.tree_file))
-    fname_list.push_back(opts.tree_file);
-  else
-    fname_list = split_string(opts.tree_file, ',');
-
-  SplitsTree ref_tree;
-  for (const auto& fname: fname_list)
-  {
-     read_newick_trees_to_list(instance.start_trees, ref_tree, fname, "input",
-                               extract_splits, require_binary);
-  }
-}
 
 void command_bootstop(RaxmlInstance& instance)
 {
@@ -2498,6 +2543,7 @@ void command_support(RaxmlInstance& instance)
   // TODO check whether this is a hard requirement or just implementation detail
   bool require_binary = opts.bs_metrics.count(BranchSupportMetric::ic1) ||
                         opts.bs_metrics.count(BranchSupportMetric::ica) ||
+                        opts.bs_metrics.count(BranchSupportMetric::gcf) ||
                         (opts.bs_metrics.count(BranchSupportMetric::tbe) && !opts.tbe_naive);
 
   assert(!opts.start_trees.empty());
@@ -2515,10 +2561,15 @@ void command_support(RaxmlInstance& instance)
 
     LOG_INFO << "Reference tree size: " << to_string(ref_tree.num_tips()) << endl << endl;
 
-    /* read all bootstrap trees from a Newick file */
-    bs_trees = read_bootstrap_trees(instance, ref_tree, true, require_binary);
-
-    draw_bootstrap_support(instance, ref_tree, ref_tree);
+    /* In streaming mode, we will read bootstrap trees one-by-one later. */
+    if (opts.use_tree_streaming)
+      draw_bootstrap_support(instance, ref_tree, require_binary);
+    else
+    {
+      /* Otherwise: read all bootstrap trees from a Newick file now. */
+      bs_trees = read_bootstrap_trees(instance, ref_tree, true, require_binary);
+      draw_bootstrap_support(instance, ref_tree, ref_tree);
+    }
   }
   else if (st_tree_type == StartingTree::consensus)
   {
@@ -2811,6 +2862,8 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
           metric_name = "Internode certainty (IC)";
         else if (it.first == BranchSupportMetric::ica)
           metric_name = "Internode certainty All (ICA)";
+        else if (it.first == BranchSupportMetric::gcf)
+          metric_name = "Gene concordance factor (gCF)";
 
         if (it.first == BranchSupportMetric::ic1 || it.first == BranchSupportMetric::ica)
         {

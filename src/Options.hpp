@@ -28,6 +28,7 @@ struct OutputFileNames
   std::string sh_support_tree;
   std::string ic1_support_tree;
   std::string ica_support_tree;
+  std::string gcf_support_tree;
   std::string terrace;
   std::string binary_msa;
   std::string bootstrap_msa;
@@ -70,6 +71,7 @@ public:
   bool use_bs_pars;
   bool use_par_pars;
   bool use_pythia;
+  bool use_tree_streaming;
 
   bool optimize_model;
   bool optimize_brlen;

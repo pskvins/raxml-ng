@@ -57,7 +57,7 @@ bool IcSupportTree::compute_support()
       if (e_alt->bip_number < ref_split_count)
         continue;
 
-      // ginore splits with frequency below threshold
+      // ignore splits with frequency below threshold
       if (_ic_all && alt_support > 0. && e_alt->support < min_alt_support)
         break;
 

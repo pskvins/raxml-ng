@@ -95,6 +95,7 @@ static struct option long_options[] =
   {"ebg",                no_argument,       0, 0 },  /*  70 */
   {"fast",               no_argument,       0, 0 },  /*  71 */
   {"modeltest",          no_argument,       0, 0 },  /*  72 */
+  {"gcf",                optional_argument, 0, 0 },  /*  73 */
 
   { 0, 0, 0, 0 }
 };
@@ -138,7 +139,7 @@ void CommandLineParser::check_options(Options &opts)
 
   if (opts.command == Command::support)
   {
-    /* only FBP, TBE and IC1/ICA are allowed in support mapping mode; other values are ignored */
+    /* only FBP, TBE, GCF and IC1/ICA are allowed in support mapping mode; other values are ignored */
     opts.bs_metrics.erase(BranchSupportMetric::rbs);
     opts.bs_metrics.erase(BranchSupportMetric::ps);
     opts.bs_metrics.erase(BranchSupportMetric::pbs);
@@ -146,6 +147,10 @@ void CommandLineParser::check_options(Options &opts)
     opts.bs_metrics.erase(BranchSupportMetric::sh_alrt);
     if (opts.bs_metrics.empty())
       opts.bs_metrics.insert(BranchSupportMetric::fbp);
+
+    /* gCF works in Newick streaming mode only */
+    if (opts.bs_metrics.count(BranchSupportMetric::gcf))
+      opts.use_tree_streaming = true;;
   }
 
   if (opts.command == Command::bootstrap)
@@ -168,6 +173,7 @@ void CommandLineParser::check_options(Options &opts)
     opts.bs_metrics.erase(BranchSupportMetric::pbs);
     opts.bs_metrics.erase(BranchSupportMetric::ebg);
     opts.bs_metrics.erase(BranchSupportMetric::sh_alrt);
+    opts.bs_metrics.erase(BranchSupportMetric::gcf);
     if (opts.bs_metrics.empty())
       opts.bs_metrics.insert(BranchSupportMetric::fbp);
   }
@@ -480,6 +486,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   
   /* enable incremental CLV updates across pruned subtrees in SPR rounds */
   opts.use_spr_fastclv = true;
+
+  /* pre-load all trees from a Newick file */
+  opts.use_tree_streaming = false;
 
   /* optimize model and branch lengths */
   opts.optimize_model = true;
@@ -1059,6 +1068,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.brlen_reset_usertree = true;
             else if (eopt == "brlen-keep")
               opts.brlen_reset_usertree = false;
+            else if (eopt == "newick-stream")
+              opts.use_tree_streaming = true;
             else if (eopt == "compat-v11")
             {
               compat_ver = 110;
@@ -1119,6 +1130,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
             else if (strncasecmp(m.c_str(), "ica", 3) == 0)
             {
               opts.bs_metrics.insert(BranchSupportMetric::ica);
+            }
+            else if (strncasecmp(m.c_str(), "gcf", 3) == 0)
+            {
+              opts.bs_metrics.insert(BranchSupportMetric::gcf);
             }
             else
             {
@@ -1369,6 +1384,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           optarg_tree = "pars{1}";
         num_commands++;
         break;
+      case 73: /* gcf: compute gene concordance factors */
+        opts.command = Command::support;
+        opts.bs_metrics.clear();
+        opts.bs_metrics.insert(BranchSupportMetric::gcf);
+        opts.use_pythia = false;
+        optarg_tree_required = true;
+        if (optarg)
+          optarg_tree = optarg;
+        num_commands++;
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -1472,6 +1497,7 @@ void CommandLineParser::print_help()
             "  --pt                                       Alias for: --pythia --nofiles --log result\n"
             "  --sh [ REPS ]                              Alias for: --all --opt-topology nni --bs-metric sh [ --sh-reps REPS ]\n"
             "  --ebg                                      Alias for: --all --bs-metric ebg --opt-topology off\n"
+            "  --gcf [ REF_TREE ]                         Alias for: --support --bs-metric gcf [ --tree REF_TREE ] \n"
             "\n"
             "Input and output options:\n"
             "  --tree            rand{N} | pars{N} |      starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
@@ -1535,6 +1561,7 @@ void CommandLineParser::print_help()
             "                 ebg | tbe | sh              ebg = Educated bootstrap guesser, tbe = Transfer bootstrap estimate, sh = SH-like aLRT\n"
             "                 ps  | pbs |                 ps = Parsimony support, pbs = Parsimony bootstrap support\n"
             "                 ic1 | ica                   ic1 = Internode certainty (most prevalent), ica = Internode certainty (all)\n"
+            "                 gcf                         gcf = Gene concordance factor\n"
             "  --bs-write-msa on | off                    write all bootstrap alignments (default: OFF)\n"
             "\n"
             "SH-like test options:\n"

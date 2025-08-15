@@ -23,7 +23,7 @@ SupportMetricSet BS_METRICS_WITH_MSA_REPS   { BranchSupportMetric::fbp, BranchSu
 Options::Options() : opt_version(RAXML_OPT_VERSION), cmdline(""), command(Command::none),
 use_tip_inner(true), use_pattern_compression(true), use_prob_msa(false), use_rate_scalers(false),
 use_repeats(true), use_rba_partload(true), use_energy_monitor(true), use_old_constraint(false),
-use_spr_fastclv(true), use_bs_pars(true), use_par_pars(true), use_pythia(true),
+use_spr_fastclv(true), use_bs_pars(true), use_par_pars(true), use_pythia(true), use_tree_streaming(false),
 optimize_model(true), optimize_brlen(true), topology_opt_method(TopologyOptMethod::adaptive),
 stopping_rule(StoppingRule::none), force_mode(false), safety_checks(SafetyCheck::all),
 redo_mode(false), nofiles_mode(false), write_interim_results(true), write_bs_msa(false),
@@ -109,6 +109,7 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.sh_support_tree, "supportSH");
   set_default_outfile(outfile_names.ic1_support_tree, "supportIC1");
   set_default_outfile(outfile_names.ica_support_tree, "supportICA");
+  set_default_outfile(outfile_names.gcf_support_tree, "supportGCF");
   set_default_outfile(outfile_names.terrace, "terrace");
   set_default_outfile(outfile_names.binary_msa, "rba");
   set_default_outfile(outfile_names.bootstrap_msa, "bootstrapMSA");
@@ -156,6 +157,8 @@ const std::string& Options::support_tree_file(BranchSupportMetric bsm) const
       return outfile_names.ic1_support_tree;
     else if (bsm == BranchSupportMetric::ica)
       return outfile_names.ica_support_tree;
+    else if (bsm == BranchSupportMetric::gcf)
+      return outfile_names.gcf_support_tree;
     else
       return outfile_names.support_tree;
   }
@@ -471,6 +474,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
           break;
         case BranchSupportMetric::ica:
           stream << "Internode Certainty All";
+          break;
+        case BranchSupportMetric::gcf:
+          stream << "Gene Concordance Factor";
           break;
       }
     }
