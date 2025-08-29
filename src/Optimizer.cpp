@@ -83,7 +83,7 @@ double Optimizer::optimize_topology(TreeInfo& treeinfo, CheckpointManager& cm)
       else
         return optimize_topology_standard(treeinfo, cm);
       break;
-    case TopologyOptMethod::fast:
+    case TopologyOptMethod::adafast:
       if (cm.checkp_file().pythia_score >= 0.)
         return optimize_topology_adaptive(treeinfo, cm);
       else
@@ -387,8 +387,8 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
 
   if (_topology_opt_method == TopologyOptMethod::adaptive)
     heuristic = "adaptive";
-  else if (_topology_opt_method == TopologyOptMethod::fast)
-    heuristic = "fast";
+  else if (_topology_opt_method == TopologyOptMethod::adafast)
+    heuristic = "adaptive-fast";
   else if (_topology_opt_method == TopologyOptMethod::simplified)
     heuristic = "simplified";
 
@@ -455,7 +455,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
       */
       if (difficulty >= 0. && _topology_opt_method != TopologyOptMethod::simplified)
       {
-        int factor = _topology_opt_method == TopologyOptMethod::fast ? 2 : 3;
+        int factor = _topology_opt_method == TopologyOptMethod::adafast ? 2 : 3;
         fast_spr_radius = min(factor * adaptive_radius(difficulty), 25);
       }
       else
@@ -537,13 +537,18 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
     LOG_PROGRESS(loglh) << "Model parameter optimization (eps = " << interim_modopt_eps << ")" << endl;
     loglh = optimize_model(treeinfo, interim_modopt_eps);
 
-    /* Set SLOW SPR radius */
-    slow_spr_radius = difficulty >= 0. ? 
-        min(adaptive_radius(difficulty),7) : 10;
-    
-    if(difficulty >= 0. && _topology_opt_method == TopologyOptMethod::fast)
-      slow_spr_radius = adaptive_radius(difficulty);
-    
+    /* Set initial SLOW SPR radius */
+    if (difficulty >= 0.)
+    {
+      int adapt_radius = adaptive_radius(difficulty);
+      if (_topology_opt_method == TopologyOptMethod::adafast)
+        slow_spr_radius = adapt_radius;
+      else
+        slow_spr_radius = min(adapt_radius, 7);
+    }
+    else
+      slow_spr_radius = 10;
+
     // in case the user has specified their own values
     if(_spr_radius > 0)
       slow_spr_radius =_spr_radius;
@@ -564,7 +569,7 @@ double Optimizer::optimize_topology_adaptive(TreeInfo& treeinfo, CheckpointManag
   
   if (do_step(CheckpointStep::slowSPR))
   {
-    if(iter == 0 && _topology_opt_method == TopologyOptMethod::fast)
+    if(iter == 0 && _topology_opt_method == TopologyOptMethod::adafast)
       nni(treeinfo, nni_params, loglh);
 
     do

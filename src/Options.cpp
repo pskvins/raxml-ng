@@ -427,8 +427,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       case TopologyOptMethod::simplified:
         stream << "simplified";
         break;
-      case TopologyOptMethod::fast:
-        stream << "fast";
+      case TopologyOptMethod::adafast:
+        stream << "fast adaptive";
         break;
       case TopologyOptMethod::none:
         stream << "OFF";

@@ -506,8 +506,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.nni_tolerance = DEF_NNI_TOLERANCE;
   opts.nni_epsilon = DEF_NNI_BR_LEN_EPSILON;
 
-  /* Stopping criteria */
-  opts.stopping_rule = StoppingRule::kh; // by default, we use the KH-simple as a stopping rule
+  /* default: disable stop rule */
+  opts.stopping_rule = StoppingRule::none;
 
   /* default: SH parameters */
   opts.num_sh_reps = RAXML_SH_ALRT_REPS;
@@ -1330,10 +1330,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.topology_opt_method = TopologyOptMethod::nniRound;
         else if (strcasecmp(optarg, "simplified") == 0 || strcasecmp(optarg, "sRAxML-NG") == 0){
           opts.topology_opt_method = TopologyOptMethod::simplified;
-          opts.stopping_rule = StoppingRule::none;
           opts.use_pythia = false;
-        } else if (strcasecmp(optarg, "fast") == 0) {
-          opts.topology_opt_method = TopologyOptMethod::fast;
+        } else if (strcasecmp(optarg, "adafast") == 0) {
+          opts.topology_opt_method = TopologyOptMethod::adafast;
           opts.stopping_rule = StoppingRule::kh_mult;
           opts.use_pythia = true;
         } 
@@ -1372,11 +1371,13 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         optarg_tree_required = true;
         num_commands++;
         break;
-      /* --fast (shortcut): equivalent to --opt-topology fast */
+      /* --fast mode: single pars tree + simplified heuristic + kh_mult stop rule */
       case 71:
-        opts.topology_opt_method = TopologyOptMethod::fast;
+        if (optarg_tree.empty())
+          optarg_tree = "pars{1}";
+        opts.topology_opt_method = TopologyOptMethod::simplified;
         opts.stopping_rule = StoppingRule::kh_mult;
-        opts.use_pythia = true;
+        opts.use_pythia = false;
         break;
       case 72: /* model test */
         opts.command = Command::modeltest;
@@ -1491,7 +1492,7 @@ void CommandLineParser::print_help()
             "\n"
             "Command shortcuts (mutually exclusive):\n"
             "  --search1                                  Alias for: --search --tree pars{1}\n"
-            "  --fast                                     Alias for: --search --opt-topology fast\n"
+            "  --fast                                     Alias for: --search --tree pars{1} --opt-topology simplified --stop-rule kh-mult\n"
             "  --loglh                                    Alias for: --evaluate --opt-model off --opt-branches off --nofiles --log result\n"
             "  --rf                                       Alias for: --rfdist --nofiles --log result\n"
             "  --pt                                       Alias for: --pythia --nofiles --log result\n"

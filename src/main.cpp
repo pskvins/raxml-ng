@@ -1297,7 +1297,7 @@ void autotune_start_trees(RaxmlInstance& instance)
     if (opts.constraint_tree_file.empty() || !opts.use_old_constraint)
     {
       //int pars_trees = diff_pred->num_start_trees(difficulty, 10.0, 0.5, 0.3);
-      if(opts.topology_opt_method == TopologyOptMethod::fast)
+      if(opts.topology_opt_method == TopologyOptMethod::adafast)
       {
         opts.start_trees[StartingTree::random] = 0;
         opts.start_trees[StartingTree::parsimony] = 
@@ -2085,7 +2085,7 @@ void init_stop_criterion(RaxmlInstance& instance)
      /* Use Stopping rule only in the adaptive or the sRAxML-NG heuristics */
     if (opts.topology_opt_method != TopologyOptMethod::adaptive &&
         opts.topology_opt_method != TopologyOptMethod::simplified &&
-        opts.topology_opt_method != TopologyOptMethod::fast)
+        opts.topology_opt_method != TopologyOptMethod::adafast)
     {
       LOG_INFO << "Stopping criteria are only used in adaptive/fast and sRAxML-NG heuristics. "
                << "Hence disabled." << endl;
