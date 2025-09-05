@@ -72,6 +72,7 @@ public:
   bool use_par_pars;
   bool use_pythia;
   bool use_tree_streaming;
+  bool use_pars_spr;
 
   bool optimize_model;
   bool optimize_brlen;

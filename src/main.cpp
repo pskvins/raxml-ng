@@ -1393,7 +1393,7 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type, int random_
       }
 
       const ParsimonyMSA& pars_msa = bs_pmsa ? *bs_pmsa.get() : *instance.parted_msa_parsimony.get();
-      tree = Tree::buildParsimonyConstrained(pars_msa, random_seed, &score,
+      tree = Tree::buildParsimonyConstrained(pars_msa, random_seed, opts.use_pars_spr, &score,
                                              instance.constraint_tree, instance.tip_msa_idmap);
 
       LOG_WORKER_TS(LogLevel::verbose) << "Generated a PARSIMONY starting tree, seed: " << random_seed <<

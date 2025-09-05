@@ -93,10 +93,10 @@ public:
   static Tree buildRandomConstrained(const NameList& taxon_names, unsigned int random_seed,
                                      const Tree& constrained_tree);
   static Tree buildParsimony(const ParsimonyMSA& pars_msa, unsigned int random_seed,
-                             unsigned int * score = nullptr);
+                             bool refine_with_spr, unsigned int * score = nullptr);
   static Tree buildParsimonyConstrained(const ParsimonyMSA& parted_msa, unsigned int random_seed,
-                             unsigned int * score, const Tree& constrained_tree,
-                             const IDVector& tip_msa_idmap);
+                             bool refine_with_spr, unsigned int * score,
+                             const Tree& constrained_tree, const IDVector& tip_msa_idmap);
   static Tree loadFromFile(const std::string& file_name);
 
   std::vector<const char*> tip_labels_cstr() const;

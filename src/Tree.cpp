@@ -154,14 +154,15 @@ Tree Tree::buildRandomConstrained(const NameList& taxon_names, unsigned int rand
 }
 
 Tree Tree::buildParsimony(const ParsimonyMSA& pars_msa, unsigned int random_seed,
-                          unsigned int * score)
+                          bool refine_with_spr, unsigned int * score)
 {
-  return buildParsimonyConstrained(pars_msa, random_seed, score, Tree(), IDVector());
+  return buildParsimonyConstrained(pars_msa, random_seed, refine_with_spr, score,
+                                   Tree(), IDVector());
 }
 
 Tree Tree::buildParsimonyConstrained(const ParsimonyMSA& pars_msa, unsigned int random_seed,
-                           unsigned int * score, const Tree& constrained_tree,
-                           const IDVector& tip_msa_idmap)
+                                     bool refine_with_spr, unsigned int * score,
+                                     const Tree& constrained_tree, const IDVector& tip_msa_idmap)
 {
   unsigned int lscore;
   unsigned int *pscore = score ? score : &lscore;
@@ -175,15 +176,23 @@ Tree Tree::buildParsimonyConstrained(const ParsimonyMSA& pars_msa, unsigned int 
 
   auto pars_partitions = pars_msa.pll_partitions();
 
+  unsigned int spr_cost_epsilon = 0;
+
   PllUTreeUniquePtr pll_utree;
   if (constrained_tree.empty())
   {
-    pll_utree.reset(corax_utree_create_parsimony_multipart(taxon_count,
-                                                            (char* const*) tip_labels.data(),
-                                                            pars_partitions.size(),
-                                                            pars_partitions.data(),
-                                                            random_seed,
-                                                            pscore));
+    // TODO something less adhoc ...
+    unsigned int max_spr_rounds = std::max(std::min(int(10000 / taxon_count), 10), 1);
+
+    pll_utree.reset(corax_utree_create_parsimony_multipart_spr(taxon_count,
+                                                               (char* const*) tip_labels.data(),
+                                                               pars_partitions.size(),
+                                                               pars_partitions.data(),
+                                                               refine_with_spr ? max_spr_rounds : 0,
+                                                               spr_cost_epsilon,
+                                                               random_seed,
+                                                               pscore));
+
     tree = Tree(pll_utree);
   }
   else
@@ -195,15 +204,18 @@ Tree Tree::buildParsimonyConstrained(const ParsimonyMSA& pars_msa, unsigned int 
       tip_idmap.assign(tip_msa_idmap.cbegin(), tip_msa_idmap.cend());
     }
 
+    /* NOTE; parsimony SPRs are REQUIRED with constraint tree, since the tree in constructed
+     * by resolving multifurcations in the constraint tree *randomly*, and then applying
+     * parsimony-based SPR moves to improve the parsimony score, */
     // TODO something less adhoc ...
-    unsigned int max_rounds = std::max(std::min(int(10000 / constrained_tree.num_tips()), 10), 1);
-//    printf("max_spr_rounds: %u\n", max_rounds);
+    unsigned int max_spr_rounds = std::max(std::min(int(10000 / constrained_tree.num_tips()), 10), 1);
+
     intVector clv_index_map(taxon_count * 2);
     pll_utree.reset(corax_utree_resolve_parsimony_multipart(&constrained_tree.pll_utree(),
                                                              pars_partitions.size(),
                                                              pars_partitions.data(),
                                                              tip_idmap.data(),
-                                                             max_rounds,
+                                                             max_spr_rounds,
                                                              random_seed,
                                                              clv_index_map.data(),
                                                              pscore));

@@ -490,6 +490,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* pre-load all trees from a Newick file */
   opts.use_tree_streaming = false;
 
+  /* default: do not use SPRs to improve parsimony-based stepwise addition trees */
+  opts.use_pars_spr = false;
+
   /* optimize model and branch lengths */
   opts.optimize_model = true;
   opts.optimize_brlen = true;
@@ -529,7 +532,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   opts.num_threads = 0;
   opts.num_workers = 0;
 
-  /* Difficulty preditction num trees */
+  /* Number of parsimony trees used for Pythia difficulty prediction */
   opts.diff_pred_pars_trees = RAXML_CPYTHIA_TREES_NUM;
 
   bool use_adaptive_search = true;
@@ -1060,6 +1063,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_par_pars = true;
             else if (eopt == "pars-seq")
               opts.use_par_pars = false;
+            else if (eopt == "pars-spr")
+              opts.use_pars_spr = true;
+            else if (eopt == "pars-nospr")
+              opts.use_pars_spr = false;
             else if (eopt == "pythia-on")
               opts.use_pythia = true;
             else if (eopt == "pythia-off")
@@ -1378,6 +1385,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.topology_opt_method = TopologyOptMethod::simplified;
         opts.stopping_rule = StoppingRule::kh_mult;
         opts.use_pythia = false;
+        opts.use_pars_spr = true;
         break;
       case 72: /* model test */
         opts.command = Command::modeltest;

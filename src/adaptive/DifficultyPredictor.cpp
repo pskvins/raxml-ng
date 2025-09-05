@@ -77,7 +77,7 @@ double DifficultyPredictor::predict_difficulty(int n_trees)
     seeds[i] = rand();
 
   for (int i = 0; i < n_trees; ++i)
-    _pars_tree_list.emplace_back(Tree::buildParsimony(*_parsimony_msa_ptr, seeds[i], &score));
+    _pars_tree_list.emplace_back(Tree::buildParsimony(*_parsimony_msa_ptr, seeds[i], false, &score));
   
   // re-label trees
   for (int i = 0; i < n_taxa; ++i)
