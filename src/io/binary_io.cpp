@@ -250,6 +250,79 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, ModelMap& m)
   return stream;
 }
 
+BasicBinaryStream& operator<<(BasicBinaryStream &stream,
+                              const ModelDescriptor& candidate_model)
+{
+    stream << candidate_model.datatype;
+    stream << candidate_model.substitution_model.matrix_name;
+    stream << candidate_model.substitution_model.base_frequency;
+    stream << candidate_model.rate_heterogeneity.type;
+    stream << candidate_model.rate_heterogeneity.category_count;
+
+    return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream &stream,
+                              ModelDescriptor& candidate_model)
+{
+
+    stream >> candidate_model.datatype;
+    stream >> candidate_model.substitution_model.matrix_name;
+    stream >> candidate_model.substitution_model.base_frequency;
+    stream >> candidate_model.rate_heterogeneity.type;
+    stream >> candidate_model.rate_heterogeneity.category_count;
+
+    return stream;
+}
+
+BasicBinaryStream& operator<<(BasicBinaryStream &stream,
+                              const ModelEvaluationMap &model_evaluations)
+{
+
+    const size_t n = model_evaluations.size();
+    stream << n;
+
+    for (const auto &entry : model_evaluations)
+    {
+        stream << entry.first.partition;
+        stream << entry.first.candidate_model;
+
+        stream << entry.second.model;
+        stream << entry.second.loglh;
+    }
+    
+    return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream &stream,
+                              ModelEvaluationMap &model_evaluations)
+{
+    size_t n;
+    stream >> n;
+
+    for (size_t i = 0; i < n; ++i)
+    {
+        size_t partition_index;
+        ModelDescriptor candidate_model(DataType::dna, "", BaseFrequencyType::FIXED, RateHeterogeneityType::UNIFORM);
+
+        stream >> partition_index;
+        stream >> candidate_model;
+
+        Model m(candidate_model.descriptor());
+        stream >> m;
+
+        double loglh;
+        stream >> loglh;
+
+        PartitionCandidateModel key {0, candidate_model};
+        ModelEvaluation value { std::move(m), loglh, NAN };
+
+        model_evaluations[key] = value;
+    }
+
+    return stream;
+}
+
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const TreeTopology& t)
 {
   stream << t.vroot_node_id;

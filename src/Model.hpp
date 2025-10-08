@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include "common.h"
+#include "modeltest/ModelDefinitions.hpp"
 
 typedef std::unordered_map<corax_state_t,std::string> StateNameMap;
 
@@ -107,6 +108,9 @@ public:
   Model (const std::string &model_string) : Model(DataType::autodetect, model_string) {};
 
   Model(const Model&) = default;
+  Model(Model &&) = default;
+  Model &operator=(const Model &) = default;
+  Model &operator=(Model &&) = default;
 
   /* getters */
   DataType data_type() const { return _data_type; };
@@ -118,7 +122,7 @@ public:
   const NameList& state_names() const;            // non-ambiguous states only, eg A C G T
   const StateNameMap& full_state_namemap() const; // + ambiguous states, eg A C G T M R W S Y K -
 
-  const SubstitutionModel submodel(size_t i) const { return _submodels.at(i); };
+  const SubstitutionModel &submodel(size_t i) const { return _submodels.at(i); };
 
   unsigned int ratehet_mode() const { return _rate_het; };
   unsigned int num_ratecats() const { return _num_ratecats; };
@@ -208,7 +212,14 @@ private:
   void set_user_freqs(doubleVector& freqs);
 };
 
+struct ModelEvaluation {
+  Model model;
+  double loglh;
+  double ic_score;
+};
+
 typedef std::unordered_map<size_t, Model> ModelMap;
+typedef std::unordered_map<PartitionCandidateModel, ModelEvaluation, std::hash<PartitionCandidateModel>> ModelEvaluationMap;
 typedef std::unordered_map<size_t, Model&> ModelRefMap;
 typedef std::unordered_map<size_t, const Model&> ModelCRefMap;
 

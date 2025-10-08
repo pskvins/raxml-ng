@@ -1,333 +1,281 @@
-
 #include "ModelTest.hpp"
 
+#include <iomanip>
 #include <memory>
 
-#include "ModelDefinitions.hpp"
 #include "../ICScoreCalculator.hpp"
-#include "RHASHeuristic.hpp"
+#include "Heuristics.hpp"
+#include "ModelDefinitions.hpp"
+#include "ModelScheduler.hpp"
 #include "corax/tree/treeinfo.h"
 
-Options modify_options(const Options &other) {
-    Options options(other);
-    options.lh_epsilon = 0.01; // Use same LH-epsilon as ModelTest-NG
+static thread_local std::unique_ptr<std::ofstream> thread_log;
+#define LOG_THREAD_TS                                                                                                  \
+  (*thread_log << std::setprecision(19) << global_timer().elapsed_seconds() << " MT Thread "                           \
+               << ParallelContext::thread_id())
+#define LOG_THREAD (*thread_log)
 
-    return options;
+Options modify_options(const Options &other)
+{
+  Options options(other);
+  options.lh_epsilon = 0.01;                  // Use same LH-epsilon as ModelTest-NG
+  options.brlen_linkage = CORAX_BRLEN_LINKED; // Partitions are computed in isolation, no need for scalers
+
+  return options;
 }
 
-ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa, const Tree &tree, const IDVector &tip_msa_idmap,
-                     const PartitionAssignment &part_assign)
-    : options(modify_options(original_options)), optimizer(options), msa(msa), tree(tree),
-                                            tip_msa_idmap(tip_msa_idmap), part_assign(part_assign) { }
+const std::vector<string> get_matrix_names(const DataType datatype)
+{
+  switch (datatype) {
+  case DataType::dna:
+    return dna_substitution_matrix_names;
+  case DataType::protein:
+    return aa_substitution_matrix_names;
+  case DataType::binary:
+    return std::vector<string>({"BIN"});
 
+  case DataType::autodetect:
+  case DataType::multistate:
+  case DataType::genotype10:
+  case DataType::genotype16:
+    throw unsupported_datatype_error();
+  }
 
-vector<candidate_model_t> ModelTest::generate_candidate_model_names(const DataType &dt) const {
-    vector<candidate_model_t> candidate_models;
-    check_supported_datatype(dt);
-
-    const auto &matrix_names = dt == DataType::dna ? dna_substitution_matrix_names : aa_model_names;
-
-//    const auto freerate_cmin = options.free_rate_min_categories;
-//    const auto freerate_cmax = options.free_rate_max_categories;
-
-    const auto freerate_cmin = 0;
-    const auto freerate_cmax = 0;
-//    const auto freerate_cmin = 2;
-//    const auto freerate_cmax = 6;
-
-    for (const auto &subst_model: matrix_names) {
-        for (const auto &frequency_type: default_frequency_type) {
-            for (const auto &rate_heterogeneity: default_rate_heterogeneity) {
-                if (rate_heterogeneity == rate_heterogeneity_t::FREE_RATE) {
-                    // If category range is not positive, skip freerate models
-                    if (freerate_cmin == 0 && freerate_cmax == 0) {
-                        continue;
-                    }
-
-                    candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity,
-                                                  freerate_cmin, freerate_cmax);
-                } else {
-                    candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity);
-                }
-            }
-        }
-    }
-
-    return candidate_models;
+  return {};
 }
 
+vector<ModelDescriptor> ModelTest::generate_candidate_model_names(const DataType &dt) const
+{
+  vector<ModelDescriptor> candidate_models;
+  check_supported_datatype(dt);
 
-class ExecutionStatus final {
-public:
-    ExecutionStatus() : partition_index(0), partition_count(0), model_index(0), model_count(0),
-                        use_rhas_heuristic(false) {
-    }
+  const auto freerate_cmin = options.free_rate_min_categories;
+  const auto freerate_cmax = options.free_rate_max_categories;
+  const auto gamma_category_count = 4;
 
-    void initialize(std::vector<candidate_model_t> candidate_models, size_t partition_count, bool use_rhas_heuristic = false) {
-        this->partition_index = 0;
-        this->model_index = 0;
-        this->partition_count = partition_count;
-        this->model_count = candidate_models.size();
-        this->candidate_models = std::move(candidate_models);
-        this->results = std::unique_ptr<Results>(
-            new std::vector<vector<PartitionModelEvaluation>>(partition_count));
-        this->use_rhas_heuristic = use_rhas_heuristic;
+  const auto subst_models =
+      options.modeltest_subst_models.empty() ? get_matrix_names(dt) : options.modeltest_subst_models;
 
-        const auto reference_matrix = this->candidate_models.at(0).matrix_name;
-        this->rhas_heuristic_per_part.clear();
-        this->rhas_heuristic_per_part.resize(partition_count, RHASHeuristic(reference_matrix));
-    }
+  for (const auto &subst_model : subst_models) {
+    for (const auto &frequency_type : default_frequency_type) {
+      for (const auto &rate_heterogeneity : options.modeltest_rhas) {
+        switch (rate_heterogeneity) {
+        case RateHeterogeneityType::FREE_RATE:
+        case RateHeterogeneityType::INVARIANT_FREE_RATE:
+          // If category range is not positive, skip freerate models
+          if (freerate_cmin == 0 && freerate_cmax == 0) {
+            continue;
+          }
 
-    virtual ~ExecutionStatus() = default;
-
-
-    void store_results(int partition_index, const candidate_model_t &candidate_model, PartitionModelEvaluation &result) {
-        std::lock_guard<std::mutex> lock(mutex_results);
-
-        results->at(partition_index).push_back(result);
-
-//        printf("thread: %u, model#: %s\n", ParallelContext::thread_id(), result.model.to_string().c_str());
-
-        if (use_rhas_heuristic) {
-            const double bic = result.ic_criteria.at(InformationCriterion::bic);
-            this->rhas_heuristic_per_part.at(partition_index).update(candidate_model, bic);
+          for (unsigned int c = freerate_cmin; c <= freerate_cmax; ++c) {
+            candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, c);
+          }
+          break;
+        case RateHeterogeneityType::GAMMA:
+        case RateHeterogeneityType::INVARIANT_GAMMA:
+          candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, gamma_category_count);
+          break;
+        default:
+          candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity);
+          break;
         }
+      }
+    }
+  }
+
+  return candidate_models;
+}
+
+/** Estimate the number of threads to optimize a given partition.
+ *
+ * We cannot reuse the existing ResourceEstimator, because it estimates the
+ * number of cores across _all_ partitions, whereas we need the estimated
+ * number of cores _per_ partition.
+ */
+size_t modeltest_estimate_cores(const Options &options, const PartitionInfo &pinfo,
+                                const ModelDescriptor &candidate_model, EvaluationPriority priority)
+{
+  RAXML_UNUSED(options);
+
+  const auto taxon_clv_size =
+      pinfo.length() * candidate_model.rate_heterogeneity.category_count * pinfo.model().num_states();
+
+  /* cf. `StaticResourceEstimator::compute_estimates`
+   * response for high priority tasks, throughput for all others
+   */
+  size_t elems_per_core = priority > EvaluationPriority::NORMAL ? 4000 : 80000;
+
+  const size_t naive_cores = CORAX_MAX(round(static_cast<double>(taxon_clv_size) / elems_per_core), 1.);
+  if (naive_cores <= 8)
+    elems_per_core /= 4. - log2(naive_cores);
+  else
+    elems_per_core *= log2(naive_cores) - 2;
+
+  return CORAX_MAX(round(static_cast<double>(taxon_clv_size) / elems_per_core), 1.);
+}
+
+ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa, const Tree &tree,
+                     const IDVector &tip_msa_idmap, CheckpointManager &checkpoint_manager)
+    : options(modify_options(original_options)), optimizer(options), checkpoint_manager(checkpoint_manager), msa(msa),
+      tree(tree), tip_msa_idmap(tip_msa_idmap),
+      model_scheduler(generate_candidate_model_names(msa.part_info(0).model().data_type()), msa, options,
+                      checkpoint_manager, modeltest_estimate_cores)
+{
+}
+
+vector<Model> ModelTest::optimize_model()
+{
+  if (options.log_level == LogLevel::debug && !options.outfile_prefix.empty()) {
+    thread_log.reset(new std::ofstream(options.outfile_prefix + ".raxml.modeltest.rank" +
+                                       std::to_string(ParallelContext::rank_id()) + ".thread" +
+                                       std::to_string(ParallelContext::thread_id()) + ".log"));
+  } else {
+    thread_log.reset(new std::ofstream("/dev/null"));
+  }
+
+  // sync ALL threads across ALL workers
+  ParallelContext::global_barrier();
+
+  const auto default_precision = std::cout.precision();
+  cout << std::setprecision(19);
+
+  while (true) {
+    ModelEvaluator *evaluator;
+    const auto t_start = global_timer().elapsed_seconds();
+    evaluator = model_scheduler.get_next_model();
+
+    if (evaluator == nullptr) {
+      break;
     }
 
-    void print_results(int partition_index, PartitionModelEvaluation &result) {
-        std::lock_guard<std::mutex> lock(mutex_log);
+    LOG_THREAD_TS << " scheduled to work on " << evaluator->candidate_model().descriptor() << " as thread "
+                  << evaluator->thread_id() + 1 << " out of " << evaluator->proposed_thread_count() << endl;
 
-        const auto bic_score = result.ic_criteria.at(InformationCriterion::bic);
-        LOG_WORKER_TS(LogLevel::info) << "Partition #" << partition_index << ": model = "
-                                      << std::setfill(' ') << std::left << setw(20) << result.model.to_string()
-                                      << "  LogLH = " << std::right << setw(15) << FMT_LH(result.partition_loglh)
-                                      << "  BIC = "   << std::right << setw(15) << FMT_LH(bic_score)
-                                      << endl;
-    }
+    evaluator->wait();
 
-    bool get_next_model(size_t &next_partition_index, candidate_model_t **next_candidate_model) {
-        if (partition_count < 1 || model_count < 1) {
-            throw std::logic_error("attempted to get next model before initialization");
-        }
+    const auto scheduling_overhead = global_timer().elapsed_seconds() - t_start;
 
-        std::lock_guard<std::mutex> lock(mutex_model_index);
+    /* If a heuristic applies by now, just continue with the next candidate */
+    if (evaluator->get_status() == EvaluationStatus::SKIPPED)
+      continue;
 
-        // Skip computation of models according to RHAS heuristic
-        while (use_rhas_heuristic && 
-                is_index_valid() &&
-                rhas_heuristic_per_part.at(partition_index)\
-                    .can_skip(candidate_models.at(model_index))) {
-            increment_model_index();
-        }
+    LOG_THREAD_TS << " begins work after waiting for " << 1e3 * scheduling_overhead << " milliseconds." << endl;
 
-        bool found_model = is_index_valid();
-        if (found_model) {
-            *next_candidate_model = &candidate_models.at(model_index);
-            next_partition_index = partition_index;
-        } else {
-            next_candidate_model = nullptr;
-        }
+    const auto &model_descriptor = evaluator->candidate_model().descriptor();
 
-        increment_model_index();
-
-        return found_model;
-    }
-
-
-    vector<vector<PartitionModelEvaluation> > &get_results() const {
-        return *results;
-    }
-
-private:
-    using Results = vector<vector<PartitionModelEvaluation>>;
-    std::vector<candidate_model_t> candidate_models;
-    size_t partition_index, partition_count;
-    size_t model_index, model_count;
-    std::mutex mutex_model_index;
-    std::mutex mutex_results;
-    std::mutex mutex_log;
-
-    bool use_rhas_heuristic;
-    std::vector<RHASHeuristic> rhas_heuristic_per_part;
-
-    std::unique_ptr<Results> results;
-
-    void increment_model_index() {
-        // Increment model index and optionally partition index
-        if (model_index == model_count - 1) {
-            ++partition_index;
-        }
-
-        model_index = (model_index + 1) % model_count;
-
-    }
-
-    bool is_index_valid() const {
-        return partition_index < partition_count && model_index < model_count; 
-    }
-};
-
-ExecutionStatus execution_status; // shared across all threads.
-
-vector<string> ModelTest::optimize_model() {
-    const bool enable_rhas_heuristic = std::getenv("MODELTEST_RHAS_NOSKIP") == nullptr;
-    const bool enable_freerate_heuristic = std::getenv("MODELTEST_FREERATE_NOSKIP") == nullptr;
-
-    // TODO this destroyed timestamps -> use local formatting!
-//    LOG_INFO << std::setprecision(20) << std::setfill(' ') << std::left;
-
-    if (ParallelContext::master()) {
-        // TODO: support multiple partitions with mixed datatypes
-        auto candidate_models = generate_candidate_model_names(msa.part_info(0).model().data_type());
-        execution_status.initialize(candidate_models, msa.part_count(), enable_rhas_heuristic);
-    }
-
-    // sync ALL threads across ALL workers
-    // TODO: MPI
-    ParallelContext::global_thread_barrier();
-
-
-    size_t partition_index;
-    candidate_model_t *candidate_model;
-
-
-
-    while (execution_status.get_next_model(partition_index, &candidate_model))
+    PartitionAssignment assignment;
     {
-        double last_score = std::numeric_limits<double>::infinity();
-        for (unsigned int num_rate_cats = candidate_model->rate_categories;
-             num_rate_cats <= candidate_model->max_rate_categories; ++num_rate_cats) {
-            const auto &model_descriptor = candidate_model->descriptor + (
-                                               candidate_model->rate_heterogeneity == rate_heterogeneity_t::FREE_RATE
-                                                   ? std::to_string(num_rate_cats)
-                                                   : "");
+      /* Assign a fair share of sites to all threads, with the higher thread ids taking care of the remainder */
 
-//            LOG_WORKER_TS(LogLevel::info) << "partition " << partition_index + 1 << "/" << msa.part_count()
-//                << " model " << normalize_model_name(model_descriptor) << endl;
+      assert(evaluator->thread_id() < evaluator->assigned_threads());
+      const auto n = msa.part_info(evaluator->partition_index()).length();
+      const auto fair_share = n / evaluator->assigned_threads();
 
-            Model model(model_descriptor);
-            assign(model, msa.part_info(partition_index).stats());
-            TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, part_assign, partition_index, model);
-            optimizer.optimize_model(treeinfo);
+      const auto remainder_tid = evaluator->assigned_threads() - n % evaluator->assigned_threads();
+      const bool remainder_assigned = evaluator->thread_id() >= remainder_tid;
+      const auto assigned_sites = remainder_assigned ? fair_share + 1 : fair_share;
 
-            // Retrieve values from optimized partition
-            // partition id is always 0, since our treeinfo only contains a single partition
-            assign(model, treeinfo, 0); 
-
-
-            const double partition_loglh = treeinfo.pll_treeinfo().partition_loglh[0];
-            const size_t free_params = model.num_free_params() + treeinfo.tree().num_branches();
-            const size_t sample_size = msa.part_info(partition_index).stats().site_count;
-            ICScoreCalculator ic_score_calculator(free_params, sample_size);
-
-            PartitionModelEvaluation partition_results { model, partition_loglh, ic_score_calculator.all(partition_loglh) };
-
-            const double new_score = partition_results.ic_criteria.at(InformationCriterion::bic);
-            execution_status.store_results(partition_index, *candidate_model, partition_results);
-            execution_status.print_results(partition_index, partition_results);
-
-            if (candidate_model->rate_heterogeneity == rate_heterogeneity_t::FREE_RATE && enable_freerate_heuristic &&
-                new_score >= last_score) {
-                break; // Skip evaluating freerate
-            }
-
-            last_score = new_score;
-        }
+      size_t start_index;
+      if (remainder_assigned) {
+        start_index = remainder_tid * fair_share + (evaluator->thread_id() - remainder_tid) * (fair_share + 1);
+      } else {
+        start_index = evaluator->thread_id() * fair_share;
+      }
+      assignment.assign_sites(0, start_index, assigned_sites,
+                              evaluator->candidate_model().rate_heterogeneity.category_count);
+      LOG_THREAD_TS << " assigned sites offset=" << start_index << " length=" << assigned_sites << " total_sites=" << n
+                    << endl;
     }
 
-    // sync ALL threads across ALL workers
-    // TODO: MPI
-    ParallelContext::global_thread_barrier();
+    evaluator->barrier();
+    const Model &model = evaluator->get_result().model;
+    TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, assignment, evaluator->partition_index(), model);
 
-    vector<string> best_model_per_part;
-    if (ParallelContext::master()) {
-        auto xml_fname = options.output_fname("modeltest.xml");
-        fstream xml_stream(xml_fname, std::ios::out);
+    treeinfo.custom_reduce(evaluator, ModelEvaluator::reduce);
+    optimizer.optimize_model(treeinfo);
+    evaluator->barrier();
 
-        print_xml(xml_stream, execution_status.get_results());
-        xml_stream.close();
+    if (evaluator->thread_id() == 0) {
+      // Retrieve values from optimized partition.
+      // The partition id is always 0, since our treeinfo only contains a single partition
+      Model optimized_model(model.to_string());
+      assign(optimized_model, treeinfo, 0);
 
-        LOG_DEBUG << "XML model selection file written to " << xml_fname << endl;
+      const double loglh = treeinfo.pll_treeinfo().partition_loglh[0];
+      const size_t free_params = model.num_free_params() + treeinfo.tree().num_branches();
+      const size_t sample_size = msa.part_info(evaluator->partition_index()).stats().site_count;
+      ICScoreCalculator ic_score_calculator(free_params, sample_size);
 
+      double ic_score = ic_score_calculator.compute(options.model_selection_criterion, loglh);
 
+      const auto t0 = global_timer().elapsed_seconds();
+      model_scheduler.update_result(*evaluator, ModelEvaluation{std::move(optimized_model), loglh, ic_score});
+      const auto t1 = global_timer().elapsed_seconds();
 
-
-        auto bestmodel_fname = options.output_fname("modeltest.bestModel");
-        fstream bestmodel_stream(bestmodel_fname, std::ios::out);
-
-        LOG_INFO << endl << "Best model(s):" << endl;
-        auto results = execution_status.get_results();
-        for (auto p = 0U; p < msa.part_count(); ++p) {
-            auto bic_ranking = rank_by_score(results, InformationCriterion::bic, p);
-            const auto &best_model = results.at(p).at(bic_ranking.at(0));
-            LOG_INFO << "Partition #" << p << ": " << best_model.model.to_string()
-                     << " (LogLH = " << FMT_LH(best_model.partition_loglh)
-                     << "  BIC = "  << FMT_LH(best_model.ic_criteria.at(InformationCriterion::bic))
-                     << ")" << endl;
-
-            bestmodel_stream << best_model.model.to_string(true, logger().precision(LogElement::model)) << ", " << msa.part_info(p).name() 
-                << " = " << msa.part_info(p).range_string() << endl;
-
-
-            best_model_per_part.emplace_back(best_model.model.to_string(false));
-        }
+      LOG_THREAD_TS << " evaluation of " << evaluator->candidate_model().descriptor()
+                    << " finished, IC = " << evaluator->get_result().ic_score
+                    << ", LogLH = " << evaluator->get_result().loglh
+                    << ", aborted = " << (evaluator->get_status() == EvaluationStatus::SKIPPED) << std::endl;
+      LOG_THREAD_TS << " announced results in " << 1e3 * (t1 - t0) << " milliseconds." << endl;
     }
-    return best_model_per_part;
+
+    LOG_THREAD_TS << " evaluation of " << model_descriptor << " concluded." << endl;
+  }
+
+  cout << std::setprecision(default_precision);
+
+  // sync ALL threads across ALL workers
+  const auto t0 = global_timer().elapsed_seconds();
+  ParallelContext::global_barrier();
+  const auto t1 = global_timer().elapsed_seconds();
+  LOG_THREAD_TS << " final synchronization took " << 1e3 * (t1 - t0) << " milliseconds." << endl;
+
+  if (ParallelContext::local_group_id() == 0 && ParallelContext::group_master_thread()) {
+    model_scheduler.fetch_global_results();
+  }
+
+  vector<Model> best_model_per_part;
+  if (ParallelContext::master()) {
+    auto xml_fname = options.output_fname("modeltest.xml");
+    fstream xml_stream(xml_fname, std::ios::out);
+    model_scheduler.print_xml(xml_stream);
+    xml_stream.close();
+
+    LOG_DEBUG << "XML model selection file written to " << xml_fname << endl;
+
+    auto bestmodel_fname = options.output_fname("modeltest.bestModel");
+    fstream bestmodel_stream(bestmodel_fname, std::ios::out);
+
+    LOG_INFO << endl << "Best model(s):" << endl;
+    const auto results = model_scheduler.collect_finished_results_by_partition();
+    for (auto p = 0U; p < msa.part_count(); ++p) {
+      auto bic_ranking = rank_by_score(results.at(p));
+      const auto &best_model = results.at(p).at(bic_ranking.at(0));
+      logger().logstream(LogLevel::result, LogScope::thread)
+          << "Partition #" << p << ": " << best_model->model.to_string() << " (LogLH = " << FMT_LH(best_model->loglh)
+          << "  BIC = " << FMT_LH(best_model->ic_score) << ")" << endl;
+
+      bestmodel_stream << best_model->model.to_string(true, logger().precision(LogElement::model)) << ", "
+                       << msa.part_info(p).name() << " = " << msa.part_info(p).range_string() << endl;
+
+      best_model_per_part.emplace_back(best_model->model);
+    }
+  }
+
+  thread_log->close();
+
+  return best_model_per_part;
 }
 
-vector<size_t> ModelTest::rank_by_score(const EvaluationResults &results,
-                                        InformationCriterion ic,
-                                        unsigned int partition_idx) {
-    std::vector<size_t> ranking(results.at(partition_idx).size(), 0);
-    std::iota(ranking.begin(), ranking.end(), 0);
+vector<size_t> ModelTest::rank_by_score(const vector<ModelEvaluation const *> &results)
+{
+  std::vector<size_t> ranking(results.size(), 0);
+  std::iota(ranking.begin(), ranking.end(), 0);
 
-    std::sort(ranking.begin(), ranking.end(),
-              [partition_idx, ic, &results](const size_t &a, const size_t &b) {
-                  return results.at(partition_idx).at(a).ic_criteria.at(ic) <
-                         results.at(partition_idx).at(b).ic_criteria.at(ic);
-              });
+  std::sort(ranking.begin(), ranking.end(),
+            [&results](const size_t &a, const size_t &b) { return results.at(a)->ic_score < results.at(b)->ic_score; });
 
-    return ranking;
+  return ranking;
 }
 
-
-vector<double> transform_delta_to_weight(const vector<double> &deltas) {
-    vector<double> weights(deltas.size());
-    weights.clear();
-
-    for (const double &delta: deltas) {
-        weights.push_back(std::exp(-delta / 2));
-    }
-
-    // normalize
-    const double fac = 1 / std::accumulate(weights.begin(), weights.end(), 0.0);
-
-    for (double &w: weights) {
-        w *= fac;
-    }
-
-    return weights;
-}
-
-
-void ModelTest::print_xml(ostream &os, EvaluationResults &results) {
-    os << setprecision(17);
-    os << "<modeltestresults>" << endl;
-
-    unsigned int partition_index = 0;
-
-    for (const auto &partition_result: results) {
-        os << "<partition id=\"" << partition_index++ << "\">" << endl;
-        for (const auto &result: partition_result) {
-            os << "<model name=\"" << result.model.to_string()
-                    << "\" lnL=\"" << result.partition_loglh
-                    << "\" score-bic=\"" << result.ic_criteria.at(InformationCriterion::bic)
-                    << "\" score-aic=\"" << result.ic_criteria.at(InformationCriterion::aic)
-                    << "\" score-aicc=\"" << result.ic_criteria.at(InformationCriterion::aicc)
-                    << "\" free-params=\"" << result.model.num_free_params() << "\" />" << endl;
-        }
-        os << "</partition>" << endl;
-    }
-
-    os << "</modeltestresults>" << endl;
-}
+unsigned int ModelTest::recommended_thread_count() const { return model_scheduler.recommended_thread_count(); }

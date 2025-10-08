@@ -1,8 +1,11 @@
+#include <chrono>
 #include <stdio.h>
 
 #include "Checkpoint.hpp"
+#include "ParallelContext.hpp"
 #include "io/binary_io.hpp"
 #include "io/file_io.hpp"
+#include "modeltest/ModelDefinitions.hpp"
 #include "util/EnergyMonitor.hpp"
 
 using namespace std;
@@ -79,7 +82,7 @@ void CheckpointFile::write_tmp_bs_tree(const Tree& tree) const
 }
 
 CheckpointManager::CheckpointManager(const Options& opts) :
-    _active(opts.nofiles_mode ? false : true), _ckp_fname(opts.checkp_file())
+    _active(opts.nofiles_mode ? false : true), _ckp_fname(opts.checkp_file()), timestamp_last_checkpoint{}
 {
   _checkp_file.opts = opts;
 }
@@ -94,25 +97,19 @@ Checkpoint& CheckpointManager::checkpoint(size_t ckp_id)
   return _checkp_file.checkp_list.at(ckp_id);
 }
 
-void CheckpointManager::init_checkpoints(const Tree& tree, const ModelCRefMap& models)
+void CheckpointManager::init_checkpoints(const Tree& tree, const ModelCRefMap& models, size_t num_local_groups)
 {
   /* create one checkpoint per *local* worker */
-  for (size_t i = 0; i < ParallelContext::num_local_groups(); ++i)
+  for (size_t i = 0; i < num_local_groups; ++i)
     _checkp_file.checkp_list.emplace_back();
 
   for (auto& ckp: _checkp_file.checkp_list)
   {
     ckp.lh_epsilon = DEF_LH_EPSILON;
     ckp.tree = tree;
-    for (auto& it: models)
-      ckp.models[it.first] = it.second;
   }
 
-  for (auto& it: models)
-    _checkp_file.best_models[it.first] = it.second;
-
-  // TODO: do we need this?
-//  update_models(models);
+  update_models(models);
 }
 
 void CheckpointManager::update_models(const ModelCRefMap& models)
@@ -122,6 +119,9 @@ void CheckpointManager::update_models(const ModelCRefMap& models)
     for (auto& it: models)
       ckp.models[it.first] = it.second;
   }
+
+  for (auto& it: models)
+    _checkp_file.best_models[it.first] = it.second;
 }
 
 void CheckpointManager::write(const std::string& ckp_fname) const
@@ -141,6 +141,8 @@ void CheckpointManager::write(const std::string& ckp_fname) const
     fs << _checkp_file;
 
     remove_backup();
+
+    timestamp_last_checkpoint = std::chrono::steady_clock::now();
   }
 }
 
@@ -286,6 +288,18 @@ void CheckpointManager::update_and_write(const TreeInfo& treeinfo)
       write();
 
     _checkp_file.write_tmp_best_tree();
+  }
+}
+
+void CheckpointManager::update_and_write(const PartitionCandidateModel &candidate_model, const ModelEvaluation &model)
+{
+  _checkp_file.model_evaluations[candidate_model] = model;
+
+  /* The method could be called by any thread on the master rank. */
+  if (ParallelContext::master_rank() && _active && minimum_time_exceeded())
+  {
+    ParallelContext::UniqueLock lock;
+    write();
   }
 }
 
@@ -436,6 +450,8 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const CheckpointFile& c
 
   stream << ckpfile.best_models;
 
+  stream << ckpfile.model_evaluations;
+
   stream << ckpfile.ml_trees;
 
   stream << ckpfile.bs_trees;
@@ -486,6 +502,11 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, CheckpointFile& ckpfile
   }
 
   stream >> ckpfile.best_models;
+
+  if (ckpfile.version > 7)
+  {
+      stream >> ckpfile.model_evaluations;
+  }
 
   stream >> ckpfile.ml_trees;
 

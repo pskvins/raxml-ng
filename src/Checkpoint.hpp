@@ -1,13 +1,18 @@
 #ifndef RAXML_CHECKPOINT_HPP_
 #define RAXML_CHECKPOINT_HPP_
 
+#include "Model.hpp"
 #include "common.h"
 #include "TreeInfo.hpp"
 #include "io/binary_io.hpp"
 #include "adaptive/DifficultyPredictor.hpp"
+#include "modeltest/ModelDefinitions.hpp"
+#include <unordered_map>
+#include <chrono>
 
-constexpr int RAXML_CKP_VERSION = 7;
+constexpr int RAXML_CKP_VERSION = 8;
 constexpr int RAXML_CKP_MIN_SUPPORTED_VERSION = 7;
+constexpr auto RAXML_CKP_MIN_INTERVAL = std::chrono::seconds(1);
 
 struct MLTree
 {
@@ -80,6 +85,7 @@ struct CheckpointFile
   std::vector<Checkpoint> checkp_list;
 
   ModelMap best_models;         /* model parameters for the best-scoring ML tree */
+  std::unordered_map<PartitionCandidateModel, ModelEvaluation> model_evaluations;    /* model parameters for model testing */
   ScoredTopologyMap ml_trees;   /* ML trees from all individual searches*/
   ScoredTopologyMap bs_trees;   /* bootstrap replicate trees */
 
@@ -108,10 +114,15 @@ public:
 
   double pythia_score() const { return _checkp_file.pythia_score; }
   void pythia_score(double score) { _checkp_file.pythia_score = score; }
+
   void set_epsilon(double _epsilon) { checkpoint().lh_epsilon = _epsilon; }
   double get_epsilon() const { return checkpoint().lh_epsilon; }
 
-  void init_checkpoints(const Tree& tree, const ModelCRefMap& models);
+  const ModelEvaluationMap &get_model_candidates() const {
+      return _checkp_file.model_evaluations;
+  }
+
+  void init_checkpoints(const Tree& tree, const ModelCRefMap& models, size_t num_local_groups);
 
   /* Allow reinitialization of models after modeltesting routine has completed.
      Necessary because the partition models might be different from the ones
@@ -123,6 +134,7 @@ public:
   void disable() { _active = false; }
 
   void update_and_write(const TreeInfo& treeinfo);
+  void update_and_write(const PartitionCandidateModel &candidate_model, const ModelEvaluation &model);
 
   void save_ml_tree();
   void save_bs_tree();
@@ -148,6 +160,12 @@ private:
   
   void gather_model_params();
   std::string backup_fname() const { return _ckp_fname + ".bk"; }
+
+  bool minimum_time_exceeded() const {
+      return (std::chrono::steady_clock::now() - timestamp_last_checkpoint) > RAXML_CKP_MIN_INTERVAL;
+  };
+
+  mutable std::chrono::time_point<std::chrono::steady_clock> timestamp_last_checkpoint;
 };
 
 BasicBinaryStream& operator<<(BasicBinaryStream& stream, const Checkpoint& ckp);

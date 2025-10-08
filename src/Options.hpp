@@ -3,7 +3,10 @@
 
 #include "common.h"
 #include "PartitionedMSA.hpp"
+#include "modeltest/RHASHeuristic.hpp"
+#include "types.hpp"
 #include "util/SafetyCheck.hpp"
+#include "modeltest/ModelDefinitions.hpp"
 
 constexpr int RAXML_OPT_VERSION = 5;
 
@@ -148,13 +151,35 @@ public:
   unsigned int num_sh_reps;
   double sh_epsilon;
 
+
+  /* Modeltest */
+  unsigned int free_rate_min_categories;
+  unsigned int free_rate_max_categories;
+  FreerateOptMethod free_rate_opt_method;
+  InformationCriterion model_selection_criterion;
+  HeuristicSelection modeltest_heuristics;
+  double modeltest_significant_ic_delta;
+  RateHeterogeneitySelection modeltest_rhas;
+  RHASHeuristicMode modeltest_rhas_heuristic_mode;
+  std::vector<std::string> modeltest_subst_models;
+
+
   bool coarse() const { return num_workers > 1; };
+  bool auto_model() const {
+      return command == Command::modeltest || \
+            (strcasecmp(model_file.c_str(), "auto") == 0) || \
+            (strcasecmp(model_file.c_str(), "dna") == 0) || \
+            (strcasecmp(model_file.c_str(), "aa") == 0) || \
+            (strcasecmp(model_file.c_str(), "bin") == 0);
+  }
 
   unsigned int num_bootstrap_ml_trees() const;
   unsigned int num_bootstrap_pars_trees() const;
   unsigned int num_pars_trees() const;
   unsigned int num_bootstrap_msa_reps() const;
 
+  std::string ic_name() const;
+  std::string free_rate_opt_method_name() const;
   std::string simd_arch_name() const;
   std::string consense_type_name() const;
   std::string stopping_rule_name() const;

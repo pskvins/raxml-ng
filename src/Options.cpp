@@ -1,4 +1,7 @@
 #include "Options.hpp"
+#include "modeltest/ModelDefinitions.hpp"
+#include "modeltest/RHASHeuristic.hpp"
+#include "types.hpp"
 //#include <stdlib.h>
 #include <climits>
 
@@ -41,7 +44,9 @@ msa_file(""), model_file(""), weights_file(""), outfile_prefix(""),
 num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_max(UINT_MAX),
 simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit),
 diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10),
-num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON)
+num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON),
+free_rate_min_categories(0), free_rate_max_categories(0), free_rate_opt_method(FreerateOptMethod::LBFGSB),
+model_selection_criterion(InformationCriterion::bic), modeltest_heuristics({HeuristicType::FREERATE, HeuristicType::RHAS}), modeltest_significant_ic_delta(10.0), modeltest_rhas(default_rate_heterogeneity_selection), modeltest_rhas_heuristic_mode(RHASHeuristicMode::AllSignficantCategoryCounts)
 {}
 
 unsigned int Options::max_num_replicates(const SupportMetricSet& mset) const
@@ -273,6 +278,33 @@ void Options::remove_tmp_files() const
   sysutil_file_remove(tmp_best_tree_file());
   sysutil_file_remove(tmp_ml_trees_file());
   sysutil_file_remove(tmp_bs_trees_file());
+}
+
+string Options::free_rate_opt_method_name() const
+{
+    switch(free_rate_opt_method) {
+    case FreerateOptMethod::EM:
+        return "Expectation-Maximization";
+    case FreerateOptMethod::LBFGSB:
+        return "L-BFGS-B";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+std::string Options::ic_name() const
+{
+    switch (model_selection_criterion)
+    {
+        case InformationCriterion::aic:
+            return "AIC";
+        case InformationCriterion::aicc:
+            return "AICc";
+        case InformationCriterion::bic:
+            return "BIC";
+        default:
+            assert(0);
+    }
 }
 
 string Options::simd_arch_name() const
@@ -640,6 +672,49 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       stream << "user-specified";
     stream << ")" << endl;
   }
+  stream << "  FreeRate Optimization Method: " << opts.free_rate_opt_method_name() << endl;
+  stream << "  Modeltest Information Criterion: " << opts.ic_name() << endl;
+  stream << "  Modeltest Heuristics: ";
+
+  for (const auto &heuristic : opts.modeltest_heuristics)
+  {
+      switch(heuristic)
+      {
+
+        case HeuristicType::FREERATE:
+          stream << "Freerate "; break;
+        case HeuristicType::RHAS:
+          stream << "RHAS(Δ=" << opts.modeltest_significant_ic_delta 
+              << ", mode=" << (opts.modeltest_rhas_heuristic_mode == RHASHeuristicMode::AllSignficantCategoryCounts ? "all significant" : "only optimal")
+              << ") ";
+          break;
+        default:
+          break;
+      }
+  }
+  if (opts.modeltest_heuristics.empty())
+  {
+      stream << " none";
+  }
+  stream << endl;
+
+  if (!opts.modeltest_subst_models.empty())
+  {
+    stream << "  Modeltest Substitution Models: ";
+    for (const auto &m : opts.modeltest_subst_models)
+    {
+        stream << m << " ";
+    }
+    stream << endl;
+  }
+
+  stream << "  Modeltest RHAS: ";
+  for (const auto &r : opts.modeltest_rhas)
+  {
+      const auto &label = rate_heterogeneity_label.at(static_cast<size_t>(r));
+      stream << (label.empty() ? "E" : label) << " ";
+  }
+  stream << endl;
 
   stream << "  SIMD kernels: " << opts.simd_arch_name() << endl;
 

@@ -35,14 +35,30 @@ else()
   set(ENABLE_GMP OFF)
 endif()
 
-#set(CMAKE_CXX_STANDARD 14)
-#set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # set these flags globally for all subprojects (libpll etc.)
-set (CMAKE_CXX_FLAGS_DEBUG    "-O3 -g" CACHE INTERNAL "")
+set(CMAKE_CXX_FLAGS_DEBUG "-O3 -ggdb" CACHE INTERNAL "")
 set (CMAKE_CXX_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
-set (CMAKE_C_FLAGS_DEBUG    "-O3 -g" CACHE INTERNAL "")
+set(CMAKE_C_FLAGS_DEBUG "-O3 -ggdb" CACHE INTERNAL "")
 set (CMAKE_C_FLAGS_RELEASE  "-O3"    CACHE INTERNAL "")
+
+option(DEBUG_INFO "Compile with debug info" OFF)
+if (DEBUG_INFO)
+    set (CMAKE_C_FLAGS_RELEASE  "${CMAKE_C_FLAGS_RELEASE} -ggdb -grecord-gcc-switches"    CACHE INTERNAL "")
+    set (CMAKE_CXX_FLAGS_RELEASE  "${CMAKE_CXX_FLAGS_RELEASE} -ggdb -grecord-gcc-switches"    CACHE INTERNAL "")
+endif()
+
+option(ENABLE_SANITIZERS "Use UBSan and Thread Sanitizer" OFF)
+
+if (ENABLE_SANITIZERS)
+    set(SANITIZER "address")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=${SANITIZER}" CACHE INTERNAL "")
+endif()
 
 project (raxml-ng C CXX)
 

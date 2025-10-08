@@ -11,6 +11,8 @@
 #include <unordered_set>
 #include <random>
 
+#include <corax/corax.h>
+
 
 enum class StartingTree
 {
@@ -153,6 +155,12 @@ namespace ConsenseCutoff
     MR = 50,
     strict = 100
   };
+};
+
+enum class FreerateOptMethod
+{
+    EM,
+    LBFGSB
 };
 
 const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};
