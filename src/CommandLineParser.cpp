@@ -1100,52 +1100,54 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
                 opts.lh_epsilon = DEF_LH_EPSILON_V11;
               opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
             }
-            else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_delta.size())) == opt_modeltest_delta && eopt.length() > opt_modeltest_delta.size())
+            else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_delta.size())) == opt_modeltest_delta &&
+                     eopt.length() > opt_modeltest_delta.size())
             {
-                opts.modeltest_significant_ic_delta = std::strtod(eopt.substr(opt_modeltest_delta.size()).c_str(), nullptr);
+              opts.modeltest_significant_ic_delta = std::strtod(eopt.substr(opt_modeltest_delta.size()).c_str(), nullptr);
             }
             else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_heuristics.size())) == opt_modeltest_heuristics)
             {
-                const auto heuristics = split_string(eopt.substr(opt_modeltest_heuristics.size()), '+');
+              const auto heuristics = split_string(eopt.substr(opt_modeltest_heuristics.size()), '+');
 
-                HeuristicSelection selection;
+              HeuristicSelection selection;
 
-                for (const auto &heuristic : heuristics)
-                {
-                    if (heuristic == std::string("rhas"))
-                    {
-                        selection.insert(HeuristicType::RHAS);
-                    } else if (heuristic == std::string("freerate"))
-                    {
-                        selection.insert(HeuristicType::FREERATE);
-                    } else
-                    {
-                        throw InvalidOptionValueException("Invalid modeltest heuristic: '" + heuristic + "'");
-                    }
-                }
+              for (const auto &heuristic : heuristics)
+              {
+                  if (heuristic == std::string("rhas"))
+                  {
+                      selection.insert(HeuristicType::RHAS);
+                  } else if (heuristic == std::string("freerate"))
+                  {
+                      selection.insert(HeuristicType::FREERATE);
+                  } else
+                  {
+                      throw InvalidOptionValueException("Invalid modeltest heuristic: '" + heuristic + "'");
+                  }
+              }
 
-                opts.modeltest_heuristics = selection;
-
+              opts.modeltest_heuristics = selection;
             }
             else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_rhas.size())) == opt_modeltest_rhas)
             {
-                RateHeterogeneitySelection selection;
-                for (const auto &rhas : split_string(eopt.substr(opt_modeltest_rhas.size()), ' '))
-                {
-                    const auto &effective_rhas_name = (rhas == "E" ? "" : rhas);
-                    const auto &it = std::find(rate_heterogeneity_label.cbegin(), rate_heterogeneity_label.cend(), effective_rhas_name);
-                    if (it == rate_heterogeneity_label.cend())
-                        throw InvalidOptionValueException("Invalid modeltest rate-heterogeneity model: '" + rhas + "'");
-                    selection.insert(static_cast<RateHeterogeneityType>(std::distance(rate_heterogeneity_label.cbegin(), it)));
-                }
+              RateHeterogeneitySelection selection;
+              for (const auto &rhas : split_string(eopt.substr(opt_modeltest_rhas.size()), ' '))
+              {
+                  const auto &effective_rhas_name = (rhas == "E" ? "" : rhas);
+                  const auto &it = std::find(rate_heterogeneity_label.cbegin(), rate_heterogeneity_label.cend(), effective_rhas_name);
+                  if (it == rate_heterogeneity_label.cend())
+                      throw InvalidOptionValueException("Invalid modeltest rate-heterogeneity model: '" + rhas + "'");
+                  selection.insert(static_cast<RateHeterogeneityType>(std::distance(rate_heterogeneity_label.cbegin(), it)));
+              }
 
-                opts.modeltest_rhas = selection;
-            } else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_subst_models.size())) == opt_modeltest_subst_models)
+              opts.modeltest_rhas = selection;
+            }
+            else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_subst_models.size())) == opt_modeltest_subst_models)
             {
-                opts.modeltest_subst_models = split_string(eopt.substr(opt_modeltest_subst_models.size()), ' ');
-            } else if (eopt == opt_modeltest_rhas_opt_catcount_only)
+              opts.modeltest_subst_models = split_string(eopt.substr(opt_modeltest_subst_models.size()), ' ');
+            }
+            else if (eopt == opt_modeltest_rhas_opt_catcount_only)
             {
-                opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::OnlyOptimalCategoryCount;
+              opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::OnlyOptimalCategoryCount;
             }
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(eopt));
@@ -1470,21 +1472,21 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
             ", argument must be specified as single integer or range of two positive integers, e.g. \"5\" or \"2-10\".");
         }
 
-        auto min = std::stoi(match[1]);
-        auto max = match[2].matched ? std::stoi(match[2]) : min;
-        assert(min >= 0 && max >= 0); // regex should disallow negative integers
+        auto cmin = std::stoi(match[1]);
+        auto cmax = match[2].matched ? std::stoi(match[2]) : cmin;
+        assert(cmin >= 0 && cmax >= 0); // regex should disallow negative integers
 
-        if (min == 0) {
+        if (cmin == 0) {
           throw InvalidOptionValueException("Error, number of free rate categories must be greater than 0: " + soptarg);
         }
 
-        if (min > max) {
+        if (cmin > cmax) {
           throw InvalidOptionValueException(
             "Error, minimum number of freerate categories higher than maximum: " + soptarg);
         }
 
-        opts.free_rate_min_categories = min;
-        opts.free_rate_max_categories = max;
+        opts.free_rate_min_categories = cmin;
+        opts.free_rate_max_categories = cmax;
         break;
       }
       case 75: /* freerate optimization method */
@@ -1492,6 +1494,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.free_rate_opt_method = FreerateOptMethod::EM;
         } else if (strcasecmp(optarg, "lbfgsb") == 0) {
           opts.free_rate_opt_method = FreerateOptMethod::LBFGSB;
+        } else if (strcasecmp(optarg, "auto") == 0) {
+          opts.free_rate_opt_method = FreerateOptMethod::AUTO;
         } else
           throw InvalidOptionValueException("Unknown FreeRate optimization method: " + string(optarg));
         break;

@@ -47,9 +47,12 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
   _check_lh_impr = opts.safety_checks.isset(SafetyCheck::model_lh_impr);
   _use_old_constraint = opts.use_old_constraint;
   _use_spr_fastclv = opts.use_spr_fastclv;
-  _freerate_opt = opts.free_rate_opt_method;
   _param_epsilon = RAXML_PARAM_EPSILON_MT;
   _param_opt_order = PARAM_OPT_ORDER_MODELTEST;
+
+  /* during model testing, use EM by default since it is faster */
+  _freerate_opt = (opts.free_rate_opt_method != FreerateOptMethod::AUTO) ?
+                                          opts.free_rate_opt_method : FreerateOptMethod::EM;
 
   size_t partition_count = 1;
 
@@ -125,9 +128,13 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
   _use_old_constraint = opts.use_old_constraint;
   _use_spr_fastclv = opts.use_spr_fastclv;
   _lh_epsilon = opts.lh_epsilon;
-  _freerate_opt = opts.free_rate_opt_method;
   _param_epsilon = RAXML_PARAM_EPSILON;
   _param_opt_order = PARAM_OPT_ORDER_DEFAULT;
+
+  /* during tree search  use LBFGSB by default since it is more accurate */
+  _freerate_opt = (opts.free_rate_opt_method != FreerateOptMethod::AUTO) ?
+                                          opts.free_rate_opt_method : FreerateOptMethod::LBFGSB;
+
 
   _partition_contributions.resize(parted_msa.part_count());
   double total_weight = 0;
@@ -440,6 +447,7 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                                         _param_epsilon);
               break;
             case FreerateOptMethod::LBFGSB:
+            case FreerateOptMethod::AUTO:
               new_loglh = -1 * corax_algo_opt_rates_weights_treeinfo(_pll_treeinfo,
                                                                      RAXML_FREERATE_MIN,
                                                                      RAXML_FREERATE_MAX,

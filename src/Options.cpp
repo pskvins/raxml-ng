@@ -45,8 +45,10 @@ num_threads(1), num_threads_max(1), num_ranks(1), num_workers(1), num_workers_ma
 simd_arch(CORAX_ATTRIB_ARCH_CPU), thread_pinning(false), load_balance_method(LoadBalancing::benoit),
 diff_pred_pars_trees(RAXML_CPYTHIA_TREES_NUM), nni_tolerance(1.0), nni_epsilon(10),
 num_sh_reps(RAXML_SH_ALRT_REPS), sh_epsilon(RAXML_SH_ALRT_EPSILON),
-free_rate_min_categories(0), free_rate_max_categories(0), free_rate_opt_method(FreerateOptMethod::LBFGSB),
-model_selection_criterion(InformationCriterion::bic), modeltest_heuristics({HeuristicType::FREERATE, HeuristicType::RHAS}), modeltest_significant_ic_delta(10.0), modeltest_rhas(default_rate_heterogeneity_selection), modeltest_rhas_heuristic_mode(RHASHeuristicMode::AllSignficantCategoryCounts)
+free_rate_min_categories(2), free_rate_max_categories(10), free_rate_opt_method(FreerateOptMethod::AUTO),
+model_selection_criterion(InformationCriterion::bic), modeltest_heuristics({HeuristicType::FREERATE, HeuristicType::RHAS}),
+modeltest_significant_ic_delta(10.0), modeltest_rhas(default_rate_heterogeneity_selection),
+modeltest_rhas_heuristic_mode(RHASHeuristicMode::AllSignficantCategoryCounts)
 {}
 
 unsigned int Options::max_num_replicates(const SupportMetricSet& mset) const
@@ -282,7 +284,10 @@ void Options::remove_tmp_files() const
 
 string Options::free_rate_opt_method_name() const
 {
-    switch(free_rate_opt_method) {
+    switch(free_rate_opt_method)
+    {
+    case FreerateOptMethod::AUTO:
+        return "AUTO";
     case FreerateOptMethod::EM:
         return "Expectation-Maximization";
     case FreerateOptMethod::LBFGSB:

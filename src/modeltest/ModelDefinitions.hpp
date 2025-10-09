@@ -17,7 +17,7 @@
 class unsupported_datatype_error : public std::logic_error
 {
 public:
-  unsupported_datatype_error() : std::logic_error("Modeltesting currently only supports DNA & AA data") {}
+  unsupported_datatype_error() : std::logic_error("Modeltesting currently only supports DNA, AA and BIN data") {}
 };
 
 inline void check_supported_datatype(const DataType &datatype)
@@ -74,7 +74,8 @@ const std::array<std::string, 6> rate_heterogeneity_label{
 using RateHeterogeneitySelection = std::set<RateHeterogeneityType>;
 
 const RateHeterogeneitySelection default_rate_heterogeneity_selection{
-    RateHeterogeneityType::FREE_RATE, RateHeterogeneityType::UNIFORM,         RateHeterogeneityType::INVARIANT,
+    RateHeterogeneityType::FREE_RATE, RateHeterogeneityType::INVARIANT_FREE_RATE,
+    RateHeterogeneityType::UNIFORM,   RateHeterogeneityType::INVARIANT,
     RateHeterogeneityType::GAMMA,     RateHeterogeneityType::INVARIANT_GAMMA,
 };
 

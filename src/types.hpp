@@ -159,8 +159,9 @@ namespace ConsenseCutoff
 
 enum class FreerateOptMethod
 {
-    EM,
-    LBFGSB
+  AUTO = 0,
+  EM,
+  LBFGSB
 };
 
 const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};
