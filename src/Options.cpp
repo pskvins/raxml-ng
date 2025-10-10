@@ -386,6 +386,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
   stream << "Analysis options:" << endl;
 
   stream << "  run mode: ";
+  if (opts.auto_model() && opts.command != Command::modeltest)
+    stream << "Model selection + ";
   switch(opts.command)
   {
     case Command::search:
@@ -678,11 +680,14 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     stream << ")" << endl;
   }
   stream << "  FreeRate Optimization Method: " << opts.free_rate_opt_method_name() << endl;
-  stream << "  Modeltest Information Criterion: " << opts.ic_name() << endl;
-  stream << "  Modeltest Heuristics: ";
 
-  for (const auto &heuristic : opts.modeltest_heuristics)
+  if (opts.auto_model())
   {
+    stream << "  Modeltest Information Criterion: " << opts.ic_name() << endl;
+    stream << "  Modeltest Heuristics: ";
+
+    for (const auto &heuristic : opts.modeltest_heuristics)
+    {
       switch(heuristic)
       {
 
@@ -696,30 +701,37 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         default:
           break;
       }
-  }
-  if (opts.modeltest_heuristics.empty())
-  {
-      stream << " none";
-  }
-  stream << endl;
-
-  if (!opts.modeltest_subst_models.empty())
-  {
-    stream << "  Modeltest Substitution Models: ";
-    for (const auto &m : opts.modeltest_subst_models)
+    }
+    if (opts.modeltest_heuristics.empty())
     {
+      stream << " none";
+    }
+    stream << endl;
+
+    if (!opts.modeltest_subst_models.empty())
+    {
+      stream << "  Modeltest Substitution Models: ";
+      for (const auto &m : opts.modeltest_subst_models)
+      {
         stream << m << " ";
+      }
+      stream << endl;
+    }
+
+    stream << "  Modeltest RHAS: ";
+    for (const auto &r : opts.modeltest_rhas)
+    {
+      const auto &label = rate_heterogeneity_label.at(static_cast<size_t>(r));
+      stream << (label.empty() ? "E" : label) << " ";
+    }
+    if (opts.modeltest_rhas.count(RateHeterogeneityType::FREE_RATE) ||
+        opts.modeltest_rhas.count(RateHeterogeneityType::INVARIANT_FREE_RATE))
+    {
+      stream << " (FreeRate categories: " << opts.free_rate_min_categories << "-"
+             << opts.free_rate_max_categories << ")";
     }
     stream << endl;
   }
-
-  stream << "  Modeltest RHAS: ";
-  for (const auto &r : opts.modeltest_rhas)
-  {
-      const auto &label = rate_heterogeneity_label.at(static_cast<size_t>(r));
-      stream << (label.empty() ? "E" : label) << " ";
-  }
-  stream << endl;
 
   stream << "  SIMD kernels: " << opts.simd_arch_name() << endl;
 

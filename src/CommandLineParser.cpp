@@ -88,9 +88,9 @@ static struct option long_options[] =
   {"sitelh",             no_argument, 0, 0 },        /*  55 */
   {"site-weights",       required_argument, 0, 0 },  /*  56 */
   {"bs-write-msa",       no_argument, 0, 0 },        /*  57 */
-  {"lh-epsilon-triplet", required_argument, 0, 0 },  /* 58 */
+  {"lh-epsilon-triplet", required_argument, 0, 0 },  /*  58 */
   {"adaptive",           optional_argument, 0, 0 },  /*  59 */
-  {"diff_pred_trees",    required_argument, 0, 0},   /*  60 */
+  {"pythia-trees",       required_argument, 0, 0 },  /*  60 */
   {"nni-tolerance",      required_argument, 0, 0 },  /*  61 */
   {"nni-epsilon",        required_argument, 0, 0 },  /*  62 */
   {"pythia",             optional_argument, 0, 0 },  /*  63 */
@@ -102,11 +102,10 @@ static struct option long_options[] =
   {"stop-rule",          required_argument, 0, 0 },  /*  69 */
   {"ebg",                no_argument,       0, 0 },  /*  70 */
   {"fast",               no_argument,       0, 0 },  /*  71 */
-  {"modeltest",          no_argument,       0, 0 },  /*  72 */
-  {"gcf",                optional_argument, 0, 0 },  /*  73 */
-  {"modeltest-freerate-categories", required_argument, 0, 0}, /*  74 */
-  {"freerate-opt", required_argument, 0, 0}, /* 75*/
-  {"modeltest-criterion", required_argument, 0, 0}, /* 76 */
+  {"modeltest",          optional_argument, 0, 0 },  /*  72 */
+  {"modeltest-options",  required_argument, 0, 0 },  /*  73 */
+  {"opt-freerate",       required_argument, 0, 0 },  /*  74 */
+  {"gcf",                optional_argument, 0, 0 },  /*  75 */
 
   { 0, 0, 0, 0 }
 };
@@ -458,6 +457,111 @@ void CommandLineParser::parse_consense_cutoff(Options &opts, const char* optarg)
   }
 }
 
+void CommandLineParser::parse_modeltest_options(Options &opts, const string& arg)
+{
+  auto model_opts = split_string(arg, '/');
+
+  for (auto& mopt: model_opts)
+  {
+    auto toks = split_string(mopt, '=');
+    auto mopt_name = toks[0];
+    auto mopt_val = toks.size() > 1 ? toks[1] : "";
+
+    if (mopt_name == "criterion")
+    {
+      if (mopt_val == "aic")
+          opts.model_selection_criterion = InformationCriterion::aic;
+      else if (mopt_val == "aicc")
+          opts.model_selection_criterion = InformationCriterion::aicc;
+      else if (mopt_val == "bic")
+          opts.model_selection_criterion = InformationCriterion::bic;
+      else
+          throw InvalidOptionValueException("Unknown information criterion: " + mopt_val);
+    }
+    else if (mopt_name == "freerate-categories" || mopt_name == "rcat")
+    {
+      const std::regex pattern(R"(^(\d+)(?:-(\d+))?$)");
+      std::smatch match;
+      if (!std::regex_match(mopt_val, match, pattern)) {
+        throw InvalidOptionValueException(
+          "Invalid FreeRate category specification: " + mopt_val +
+          ", argument must be specified as single integer or range of two positive integers, e.g. \"5\" or \"2-10\".");
+      }
+
+      auto cmin = std::stoi(match[1]);
+      auto cmax = match[2].matched ? std::stoi(match[2]) : cmin;
+      assert(cmin >= 0 && cmax >= 0); // regex should disallow negative integers
+
+      if (cmin == 0) {
+        throw InvalidOptionValueException("Error, number of FreeRate categories must be greater than 0: " + mopt_val);
+      }
+
+      if (cmin > cmax) {
+        throw InvalidOptionValueException(
+          "Error, minimum number of FreeRate categories higher than maximum: " + mopt_val);
+      }
+
+      opts.free_rate_min_categories = cmin;
+      opts.free_rate_max_categories = cmax;
+    }
+    else if (mopt_name == "ic-delta")
+    {
+      opts.modeltest_significant_ic_delta = std::strtod(mopt_val.c_str(), nullptr);
+    }
+    else if (mopt_name == "heuristics")
+    {
+      const auto heuristics = split_string(mopt_val, ',');
+
+      HeuristicSelection selection;
+
+      for (const auto &heuristic : heuristics)
+      {
+        if (heuristic == std::string("off"))
+        {
+          selection.clear();
+          break;
+        }
+        else if (heuristic == std::string("rhas") or heuristic == std::string("rhas-all"))
+        {
+          selection.insert(HeuristicType::RHAS);
+          opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::AllSignficantCategoryCounts;
+        }
+        else if (heuristic == std::string("rhas-best"))
+        {
+          selection.insert(HeuristicType::RHAS);
+          opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::OnlyOptimalCategoryCount;
+        }
+        else if (heuristic == std::string("freerate"))
+          selection.insert(HeuristicType::FREERATE);
+        else
+          throw InvalidOptionValueException("Invalid modeltest heuristic: '" + heuristic + "'");
+      }
+
+      opts.modeltest_heuristics = selection;
+    }
+    else if (mopt_name == "rhas")
+    {
+      RateHeterogeneitySelection selection;
+      for (const auto &rhas : split_string(mopt_val, ','))
+      {
+          const auto &effective_rhas_name = (rhas == "E" ? "" : rhas);
+          const auto &it = std::find(rate_heterogeneity_label.cbegin(), rate_heterogeneity_label.cend(), effective_rhas_name);
+          if (it == rate_heterogeneity_label.cend())
+              throw InvalidOptionValueException("Invalid modeltest rate-heterogeneity model: '" + rhas + "'");
+          selection.insert(static_cast<RateHeterogeneityType>(std::distance(rate_heterogeneity_label.cbegin(), it)));
+      }
+
+      opts.modeltest_rhas = selection;
+    }
+    else if (mopt_name == "substitution-models" || mopt_name == "qmat")
+    {
+      opts.modeltest_subst_models = split_string(mopt_val, ',');
+    }
+    else
+      throw InvalidOptionValueException("Unknown modeltest option: '" + mopt_name + "'");
+  }
+}
+
 void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
 {
 
@@ -583,6 +687,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   bool optarg_tree_required = false;
   string optarg_tree = "";
   string optarg_bs_trees = "";
+  string optarg_modeltest = "";
 
   int option_index = 0;
   int c;
@@ -1031,11 +1136,6 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 46: /* extra options */
         {
           auto extra_opts = split_string(optarg, ',');
-          const std::string opt_modeltest_delta {"modeltest-ic-delta="};
-          const std::string opt_modeltest_heuristics {"modeltest-heuristics="};
-          const std::string opt_modeltest_rhas{"modeltest-rhas="};
-          const std::string opt_modeltest_subst_models{"modeltest-substitution-models="};
-          const std::string opt_modeltest_rhas_opt_catcount_only{"modeltest-rhas-optimal-category-count-only"};
 
           for (auto& eopt: extra_opts)
           {
@@ -1099,55 +1199,6 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               if (!lh_epsilon_set)
                 opts.lh_epsilon = DEF_LH_EPSILON_V11;
               opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
-            }
-            else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_delta.size())) == opt_modeltest_delta &&
-                     eopt.length() > opt_modeltest_delta.size())
-            {
-              opts.modeltest_significant_ic_delta = std::strtod(eopt.substr(opt_modeltest_delta.size()).c_str(), nullptr);
-            }
-            else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_heuristics.size())) == opt_modeltest_heuristics)
-            {
-              const auto heuristics = split_string(eopt.substr(opt_modeltest_heuristics.size()), '+');
-
-              HeuristicSelection selection;
-
-              for (const auto &heuristic : heuristics)
-              {
-                  if (heuristic == std::string("rhas"))
-                  {
-                      selection.insert(HeuristicType::RHAS);
-                  } else if (heuristic == std::string("freerate"))
-                  {
-                      selection.insert(HeuristicType::FREERATE);
-                  } else
-                  {
-                      throw InvalidOptionValueException("Invalid modeltest heuristic: '" + heuristic + "'");
-                  }
-              }
-
-              opts.modeltest_heuristics = selection;
-            }
-            else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_rhas.size())) == opt_modeltest_rhas)
-            {
-              RateHeterogeneitySelection selection;
-              for (const auto &rhas : split_string(eopt.substr(opt_modeltest_rhas.size()), ' '))
-              {
-                  const auto &effective_rhas_name = (rhas == "E" ? "" : rhas);
-                  const auto &it = std::find(rate_heterogeneity_label.cbegin(), rate_heterogeneity_label.cend(), effective_rhas_name);
-                  if (it == rate_heterogeneity_label.cend())
-                      throw InvalidOptionValueException("Invalid modeltest rate-heterogeneity model: '" + rhas + "'");
-                  selection.insert(static_cast<RateHeterogeneityType>(std::distance(rate_heterogeneity_label.cbegin(), it)));
-              }
-
-              opts.modeltest_rhas = selection;
-            }
-            else if (eopt.substr(0, std::min(eopt.size(), opt_modeltest_subst_models.size())) == opt_modeltest_subst_models)
-            {
-              opts.modeltest_subst_models = split_string(eopt.substr(opt_modeltest_subst_models.size()), ' ');
-            }
-            else if (eopt == opt_modeltest_rhas_opt_catcount_only)
-            {
-              opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::OnlyOptimalCategoryCount;
             }
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(eopt));
@@ -1323,8 +1374,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         
         if (sscanf(optarg, "%d", &opts.diff_pred_pars_trees) != 1 || opts.diff_pred_pars_trees <= 0)
         {
-          throw InvalidOptionValueException("Invalid number of parsimony trees for difficulty prediction: " + string(optarg) +
-                                            ", please provide a positive integer!");
+          throw InvalidOptionValueException("Invalid number of parsimony trees for Pythia difficulty prediction: " +
+                                            string(optarg) + ", please provide a positive integer!");
         }
         break;
 
@@ -1448,11 +1499,26 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 72: /* model test */
         opts.command = Command::modeltest;
+        if (optarg)
+          optarg_modeltest = optarg;
         if (optarg_tree.empty())
           optarg_tree = "pars{1}";
         num_commands++;
         break;
-      case 73: /* gcf: compute gene concordance factors */
+      case 73: /* modeltest options */
+        optarg_modeltest = optarg;
+        break;
+      case 74: /* freerate optimization method */
+        if (strcasecmp(optarg, "em") == 0) {
+          opts.free_rate_opt_method = FreerateOptMethod::EM;
+        } else if (strcasecmp(optarg, "lbfgsb") == 0 || strcasecmp(optarg, "bfgs") == 0) {
+          opts.free_rate_opt_method = FreerateOptMethod::LBFGSB;
+        } else if (strcasecmp(optarg, "auto") == 0) {
+          opts.free_rate_opt_method = FreerateOptMethod::AUTO;
+        } else
+          throw InvalidOptionValueException("Unknown FreeRate optimization method: " + string(optarg));
+        break;
+      case 75: /* gcf: compute gene concordance factors */
         opts.command = Command::support;
         opts.bs_metrics.clear();
         opts.bs_metrics.insert(BranchSupportMetric::gcf);
@@ -1461,53 +1527,6 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         if (optarg)
           optarg_tree = optarg;
         num_commands++;
-        break;
-      case 74: /* modeltest free rate categories */ {
-        const std::regex pattern(R"(^(\d+)(?:-(\d+))?$)");
-        std::string soptarg(optarg);
-        std::smatch match;
-        if (!std::regex_match(soptarg, match, pattern)) {
-          throw InvalidOptionValueException(
-            "Invalid freerate category specification: " + soptarg +
-            ", argument must be specified as single integer or range of two positive integers, e.g. \"5\" or \"2-10\".");
-        }
-
-        auto cmin = std::stoi(match[1]);
-        auto cmax = match[2].matched ? std::stoi(match[2]) : cmin;
-        assert(cmin >= 0 && cmax >= 0); // regex should disallow negative integers
-
-        if (cmin == 0) {
-          throw InvalidOptionValueException("Error, number of free rate categories must be greater than 0: " + soptarg);
-        }
-
-        if (cmin > cmax) {
-          throw InvalidOptionValueException(
-            "Error, minimum number of freerate categories higher than maximum: " + soptarg);
-        }
-
-        opts.free_rate_min_categories = cmin;
-        opts.free_rate_max_categories = cmax;
-        break;
-      }
-      case 75: /* freerate optimization method */
-        if (strcasecmp(optarg, "em") == 0) {
-          opts.free_rate_opt_method = FreerateOptMethod::EM;
-        } else if (strcasecmp(optarg, "lbfgsb") == 0) {
-          opts.free_rate_opt_method = FreerateOptMethod::LBFGSB;
-        } else if (strcasecmp(optarg, "auto") == 0) {
-          opts.free_rate_opt_method = FreerateOptMethod::AUTO;
-        } else
-          throw InvalidOptionValueException("Unknown FreeRate optimization method: " + string(optarg));
-        break;
-      case 76: /* modeltest information criterion */
-        if (strcasecmp(optarg, "aic") == 0) {
-            opts.model_selection_criterion = InformationCriterion::aic;
-        } else if (strcasecmp(optarg, "aicc") == 0) {
-            opts.model_selection_criterion = InformationCriterion::aicc;
-        } else if (strcasecmp(optarg, "bic") == 0) {
-            opts.model_selection_criterion = InformationCriterion::bic;
-        } else
-            throw InvalidOptionValueException("Unknown information criterion: " + string(optarg));
         break;
       default:
         throw  OptionException("Internal error in option parsing");
@@ -1520,6 +1539,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
   /* if more than one independent command, fail */
   if (num_commands > 1)
     throw OptionException("More than one command specified");
+
+  parse_modeltest_options(opts, optarg_modeltest);
 
   if (optarg_tree.empty() && optarg_tree_required)
     throw OptionException("This command requires a reference tree, please use --tree option!");
@@ -1602,7 +1623,7 @@ void CommandLineParser::print_help()
             "  --ancestral                                ancestral state reconstruction at all inner nodes\n"
             "  --sitelh                                   print per-site log-likelihood values\n"
             "  --pythia                                   compute and print Pythia MSA difficulty score\n"
-            "  --modeltest                                select best-fit model of sequence evolution\n"
+            "  --modeltest [ OPTIONS ]                    select best-fit model of sequence evolution (OPTIONS: see below)\n"
             "\n"
             "Command shortcuts (mutually exclusive):\n"
             "  --search1                                  Alias for: --search --tree pars{1}\n"
@@ -1656,11 +1677,16 @@ void CommandLineParser::print_help()
             "  --opt-branches on | off                    ML optimization of all branch lengths (default: ON)\n"
             "  --prob-msa     on | off                    use probabilistic alignment (works with CATG and VCF)\n"
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 10)\n"
-            "  --freerate-opt em | lbfgsb                 Optimization method for freerate (default: lbfgsb)\n"
+            "  --opt-freerate em | lbfgsb                 optimization method for FreeRates (default: lbfgsb)\n"
             "\n"
-            "Modeltest options:\n"
-            "  --modeltest-freerate-categories n[-m]      Test freerate models with n categories (optionally up to and including m)\n"
-            "  --modeltest-criterion [ AIC | AICc | BIC ] Information criterion to use for model selection (default: BIC)\n"
+            "ModelTest options:\n"
+            "  --modeltest-options OPT=VAL/OPT=VAL/...    list of model testing options separated by '/'\n"
+            "      criterion=AIC | AICc | BIC             information criterion to use for model selection (default: BIC)\n"
+            "      ic-delta=VALUE                         significance threshold for IC score difference (default: 10.0)\n"
+            "      freerate-categories=n[-m]              test FreeRate models with n categories (optionally up to and including m)\n"
+            "      rhas=VAL1,VAL2,...                     list of rate heterogeneity across sites (RHAS) models (default: R,I+R,E,I,G,I+G)\n"
+            "      substitution-models=VAL1,VAL2,...      list of substitutions models (default: all supported)\n"
+            "      heuristics=VAL1,VAL2,... | OFF         heuristics to skip models (default: rhas,freerate)\n"
             "\n"
             "Topology search options:\n"
             "  --opt-topology        classic | adaptive   topology optimization method (default: adaptive)\n"
