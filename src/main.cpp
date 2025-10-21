@@ -1782,6 +1782,9 @@ void build_start_trees(RaxmlInstance& instance, unsigned int num_threads = 0)
           {
             st_tree_count++;
             opts.num_searches++;
+
+            /* fake seed which will not be used for user starting trees */
+            seeds.emplace_back(0);
           }
         }
 
@@ -2170,7 +2173,6 @@ void init_modeltest(RaxmlInstance& instance, CheckpointManager &cm)
   const auto& opts = instance.opts;
   if (!opts.auto_model())
     return;
-
 
   if (instance.start_trees.empty() && instance.pars_trees.empty()) {
     LOG_ERROR << "Please specify a tree to use for model testing" << endl;
