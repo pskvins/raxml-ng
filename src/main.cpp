@@ -1040,6 +1040,8 @@ void autotune_threads(RaxmlInstance& instance)
 {
   auto& opts = instance.opts;
 
+  instance.num_threads_modeltest = opts.num_threads;
+
   /* user provided fixed values for threads and workers */
   if (opts.num_workers > 0 && opts.num_threads > 0)
     return;
@@ -2186,8 +2188,11 @@ void init_modeltest(RaxmlInstance& instance, CheckpointManager &cm)
 
   instance.model_test.reset(new ModelTest(opts, msa, tree, instance.tip_msa_idmap, cm));
 
-  instance.num_threads_modeltest = std::min(opts.num_threads_max, instance.model_test->recommended_thread_count());
-  instance.num_threads_modeltest = opts.num_threads ? opts.num_threads : instance.num_threads_modeltest;
+  if (!instance.num_threads_modeltest)
+  {
+    instance.num_threads_modeltest = std::min(opts.num_threads_max,
+                                              instance.model_test->recommended_thread_count());
+  }
   assert(instance.num_threads_modeltest > 0);
 
   LOG_INFO << "\nStarting ModelTest with " << (user_tree ? "user" : "parsimony") <<

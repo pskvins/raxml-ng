@@ -1679,7 +1679,7 @@ void CommandLineParser::print_help()
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 10)\n"
             "  --opt-freerate em | lbfgsb                 optimization method for FreeRates (default: lbfgsb)\n"
             "\n"
-            "ModelTest options:\n"
+            "Model selection options:\n"
             "  --modeltest-options OPT=VAL/OPT=VAL/...    list of model testing options separated by '/'\n"
             "      criterion=AIC | AICc | BIC             information criterion to use for model selection (default: BIC)\n"
             "      ic-delta=VALUE                         significance threshold for IC score difference (default: 10.0)\n"
