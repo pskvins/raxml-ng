@@ -52,7 +52,7 @@ vector<ModelEvaluator> build_evaluators(const PartitionedMSA &msa,
             const auto &candidate_model = candidate_models.at(i);
             const auto priority = prioritize_candidate_model(candidate_model, reference_model);
             const auto thread_count = CORAX_MIN(resource_estimator(options, pinfo, candidate_model, priority),
-                                                ParallelContext::num_threads());
+                                                options.num_threads_max);
 
             evaluators.emplace_back(candidate_model, pinfo.stats(), p, priority, thread_count);
         }
@@ -153,8 +153,13 @@ void ModelScheduler::read_from_checkpoint(CheckpointManager &checkpoint_manager)
         }
 
         // Recompute information criterion (selection criterion might have changed since last run)
-        const ICScoreCalculator ic_calc(evaluation.model.num_free_params(), msa.part_info(key.partition).stats().site_count);
+        const auto free_params = evaluation.model.num_free_params() + branch_count;
+        const ICScoreCalculator ic_calc(free_params, msa.part_info(key.partition).stats().site_count);
         evaluation.ic_score = ic_calc.compute(options.model_selection_criterion, evaluation.loglh);
+
+//        printf("Desc: %s, Model: %s, LogLH: %lf,  BIC: %lf, FreeParam: %u\n",
+//               key.candidate_model.descriptor().c_str(),  evaluation.model.to_string(true).c_str(),
+//               evaluation.loglh, evaluation.ic_score, free_params);
 
         update_result(evaluators.at(it->second), evaluation, false, false);
     }
