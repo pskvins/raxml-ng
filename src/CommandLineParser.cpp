@@ -739,8 +739,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
 
       case 5: /* starting tree */
-        if (optarg_tree.empty())
-          optarg_tree = strdup(optarg);
+        optarg_tree = strdup(optarg);
         break;
 
       case 6: /* set prefix for output files */

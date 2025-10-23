@@ -2176,13 +2176,23 @@ void init_modeltest(RaxmlInstance& instance, CheckpointManager &cm)
   if (!opts.auto_model())
     return;
 
-  if (instance.start_trees.empty() && instance.pars_trees.empty()) {
+  if (instance.start_trees.empty())
     LOG_ERROR << "Please specify a tree to use for model testing" << endl;
-  }
 
-  // for now, use parsimony tree unless user tree is explicitly provided
-  bool user_tree = instance.opts.start_trees.count(StartingTree::user) || instance.pars_trees.empty();
-  const auto &tree = user_tree ? instance.start_trees.at(0) : instance.pars_trees.at(0);
+  // for now, use first parsimony tree unless user/random tree is explicitly provided
+  size_t tree_num = 0;
+  std::string tree_type = "parsimony";
+  if (instance.opts.start_trees.count(StartingTree::parsimony) && instance.opts.start_trees.count(StartingTree::random))
+    tree_num = instance.opts.start_trees.at(StartingTree::random);
+  else if (instance.opts.start_trees.count(StartingTree::user))
+  {
+    tree_type = "user";
+    tree_num = instance.opts.start_trees.at(StartingTree::random);
+  }
+  else if (instance.opts.start_trees.count(StartingTree::random))
+    tree_type = "random";
+
+  const auto &tree = instance.start_trees.at(tree_num);
 
   const PartitionedMSA &msa = *instance.parted_msa.get();
 
@@ -2195,8 +2205,8 @@ void init_modeltest(RaxmlInstance& instance, CheckpointManager &cm)
   }
   assert(instance.num_threads_modeltest > 0);
 
-  LOG_INFO << "\nStarting ModelTest with " << (user_tree ? "user" : "parsimony") <<
-      " starting tree using " << instance.num_threads_modeltest << " threads" << endl << endl;
+  LOG_INFO << "\nStarting ModelTest with " << tree_type << " starting tree using "
+           << instance.num_threads_modeltest << " threads" << endl << endl;
 }
 
 void reroot_tree_with_outgroup(const Options& opts, Tree& tree, bool add_root_node)
