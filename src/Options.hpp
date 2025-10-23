@@ -41,6 +41,8 @@ struct OutputFileNames
   std::string asr_tree;
   std::string asr_probs;
   std::string asr_states;
+  std::string modeltest_best_model;
+  std::string modeltest_xml;
   std::string tmp_best_tree;
   std::string tmp_ml_trees;
   std::string tmp_bs_trees;
@@ -207,6 +209,9 @@ public:
   const std::string asr_tree_file() const { return outfile_names.asr_tree; }
   const std::string asr_probs_file() const { return outfile_names.asr_probs; }
   const std::string asr_states_file() const { return outfile_names.asr_states; }
+
+  const std::string modeltest_best_model_file() const { return outfile_names.modeltest_best_model; }
+  const std::string modeltest_xml_file() const { return outfile_names.modeltest_xml; }
 
   const std::string tmp_best_tree_file() const { return outfile_names.tmp_best_tree; }
   const std::string tmp_ml_trees_file() const { return outfile_names.tmp_ml_trees; }

@@ -12,7 +12,9 @@ public:
             CheckpointManager &checkpoint_manager);
 
   /* Optimize the model and return model name per partition */
-  vector<Model> optimize_model();
+  const vector<Model>& optimize_model();
+
+  void print_results_to_file() const;
 
   unsigned int recommended_thread_count() const;
 
@@ -23,6 +25,8 @@ private:
   const PartitionedMSA &msa;
   const Tree &tree;
   const IDVector &tip_msa_idmap;
+
+  vector<Model> best_model_per_part;
 
   ModelScheduler model_scheduler;
 

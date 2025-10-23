@@ -123,7 +123,7 @@ ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa,
 {
 }
 
-vector<Model> ModelTest::optimize_model()
+const vector<Model>& ModelTest::optimize_model()
 {
   if (options.log_level == LogLevel::debug && !options.outfile_prefix.empty()) {
     thread_log.reset(new std::ofstream(options.outfile_prefix + ".raxml.modeltest.rank" +
@@ -215,7 +215,7 @@ vector<Model> ModelTest::optimize_model()
       LOG_THREAD_TS << " evaluation of " << evaluator->candidate_model().descriptor()
                     << " finished, IC = " << evaluator->get_result().ic_score
                     << ", LogLH = " << evaluator->get_result().loglh
-                    << ", aborted = " << (evaluator->get_status() == EvaluationStatus::SKIPPED) << std::endl;
+                    << ", aborted = " << (evaluator->get_status() == EvaluationStatus::SKIPPED) << endl;
       LOG_THREAD_TS << " announced results in " << 1e3 * (t1 - t0) << " milliseconds." << endl;
     }
 
@@ -234,17 +234,8 @@ vector<Model> ModelTest::optimize_model()
     model_scheduler.fetch_global_results();
   }
 
-  vector<Model> best_model_per_part;
   if (ParallelContext::master()) {
-    auto xml_fname = options.output_fname("modeltest.xml");
-    fstream xml_stream(xml_fname, std::ios::out);
-    model_scheduler.print_xml(xml_stream);
-    xml_stream.close();
-
-    LOG_DEBUG << "XML model selection file written to " << xml_fname << endl;
-
-    auto bestmodel_fname = options.output_fname("modeltest.bestModel");
-    fstream bestmodel_stream(bestmodel_fname, std::ios::out);
+    best_model_per_part.clear();
 
     LOG_INFO << endl << "Best model(s):" << endl;
     const auto results = model_scheduler.collect_finished_results_by_partition();
@@ -255,9 +246,6 @@ vector<Model> ModelTest::optimize_model()
           << "Partition #" << p << ": " << best_model->model.to_string() << " (LogLH = " << FMT_LH(best_model->loglh)
           << "  BIC = " << FMT_LH(best_model->ic_score) << ")" << endl;
 
-      bestmodel_stream << best_model->model.to_string(true, logger().precision(LogElement::model)) << ", "
-                       << msa.part_info(p).name() << " = " << msa.part_info(p).range_string() << endl;
-
       best_model_per_part.emplace_back(best_model->model);
     }
   }
@@ -266,6 +254,35 @@ vector<Model> ModelTest::optimize_model()
 
   return best_model_per_part;
 }
+
+void ModelTest::print_results_to_file() const
+{
+  auto xml_fname = options.modeltest_xml_file();
+  if (!xml_fname.empty())
+  {
+    fstream xml_stream(xml_fname, std::ios::out);
+    model_scheduler.print_xml(xml_stream);
+    xml_stream.close();
+
+    LOG_DEBUG << "XML model selection file written to " << xml_fname << endl;
+  }
+
+  auto bestmodel_fname = options.modeltest_best_model_file();
+
+  if (!bestmodel_fname.empty())
+  {
+    fstream bestmodel_stream(bestmodel_fname, std::ios::out);
+
+    assert(best_model_per_part.size() == msa.part_count());
+    for (auto p = 0U; p < best_model_per_part.size(); ++p)
+    {
+      const auto& best_model = best_model_per_part.at(p);
+      bestmodel_stream << best_model.to_string(true, logger().precision(LogElement::model)) << ", "
+                     << msa.part_info(p).name() << " = " << msa.part_info(p).range_string() << endl;
+    }
+  }
+}
+
 
 vector<size_t> ModelTest::rank_by_score(const vector<ModelEvaluation const *> &results)
 {

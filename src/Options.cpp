@@ -127,6 +127,8 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.asr_probs, "ancestralProbs");
   set_default_outfile(outfile_names.asr_states, "ancestralStates");
   set_default_outfile(outfile_names.site_loglh, "siteLH");
+  set_default_outfile(outfile_names.modeltest_best_model, "modeltest.bestModel");
+  set_default_outfile(outfile_names.modeltest_xml, "modeltest.xml");
   set_default_outfile(outfile_names.tmp_best_tree, "lastTree.TMP");
   set_default_outfile(outfile_names.tmp_ml_trees, "mlTrees.TMP");
   set_default_outfile(outfile_names.tmp_bs_trees, "bootstraps.TMP");
@@ -219,6 +221,8 @@ bool Options::result_files_exist() const
              sysutil_file_exists(asr_states_file());
     case Command::sitelh:
       return sysutil_file_exists(sitelh_file());
+    case Command::modeltest:
+      return sysutil_file_exists(modeltest_xml_file()) || sysutil_file_exists(modeltest_best_model_file());
     default:
       return false;
   }
@@ -272,6 +276,12 @@ void Options::remove_result_files() const
     sysutil_file_remove(asr_tree_file());
     sysutil_file_remove(asr_probs_file());
     sysutil_file_remove(asr_states_file());
+  }
+
+  if (command == Command::modeltest)
+  {
+    sysutil_file_remove(modeltest_xml_file());
+    sysutil_file_remove(modeltest_best_model_file());
   }
 }
 

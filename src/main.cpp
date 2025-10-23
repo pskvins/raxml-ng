@@ -3136,6 +3136,14 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
     }
   }
 
+  if (opts.command == Command::modeltest)
+  {
+    if (!opts.modeltest_xml_file().empty())
+      LOG_INFO << "Model testing results saved to: " << sysutil_realpath(opts.modeltest_xml_file()) << endl;
+    if (!opts.modeltest_best_model_file().empty())
+      LOG_INFO << "Best-fit model saved to: " << sysutil_realpath(opts.modeltest_best_model_file()) << endl;
+  }
+
   if (opts.command == Command::pythia)
   {
     LOG_RESULT << *instance.msa_diff_predictor << endl;
@@ -3657,6 +3665,10 @@ void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
 
   if (ParallelContext::master())
   {
+    /* in standalone mode, print model testing results to files */
+    if (instance.opts.command == Command::modeltest)
+      instance.model_test->print_results_to_file();
+
     for (unsigned p = 0; p < optimal_models.size(); ++p)
     {
       if (instance.opts.command == Command::modeltest)
@@ -3668,7 +3680,7 @@ void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
       else
       {
         // If modeltest is run as part of another command (e.g. tree
-        // search), only set model type but not the exact paramters to
+        // search), only set model type but not the exact parameters to
         // reduce bias when tree search uses a different starting tree
         instance.parted_msa->model(p, Model(optimal_models.at(p).to_string(false)));
       }
@@ -3807,8 +3819,11 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   generate_bootstraps(instance, cm.checkp_file());
 
   /* load checkpoint */
-
   load_checkpoint(instance, cm);
+
+  /* clear old results files */
+  if (ParallelContext::master_rank())
+    instance.opts.remove_result_files();
 
   /* initalize and perform modeltesting */
   init_modeltest(instance, cm);
@@ -3881,9 +3896,6 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   init_stop_criterion(instance);
 
-  if (ParallelContext::master_rank())
-    instance.opts.remove_result_files();
-  
   // Main routines
   thread_main(instance, cm);
 
@@ -3969,6 +3981,7 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::consense:
       case Command::sitelh:
       case Command::ancestral:
+      case Command::modeltest:
         if (!opts.redo_mode && opts.result_files_exist())
         {
           LOG_ERROR << endl << "ERROR: Result files for the run with prefix `" <<
