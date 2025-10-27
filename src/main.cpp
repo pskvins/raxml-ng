@@ -1249,7 +1249,7 @@ void load_msa(RaxmlInstance& instance)
   LOG_INFO << endl;
 }
 
-void write_binary_msa_file(RaxmlInstance& instance)
+void write_binary_msa_file(RaxmlInstance& instance, bool update = false)
 {
   const auto& opts = instance.opts;
   auto& parted_msa = *instance.parted_msa;
@@ -1258,8 +1258,8 @@ void write_binary_msa_file(RaxmlInstance& instance)
       !instance.opts.use_prob_msa && !instance.opts.binary_msa_file().empty())
   {
     auto binary_msa_fname = instance.opts.binary_msa_file();
-    if (sysutil_file_exists(binary_msa_fname) && !opts.redo_mode &&
-        opts.command != Command::parse)
+    bool rba_exists = sysutil_file_exists(binary_msa_fname);
+    if (rba_exists && !opts.redo_mode && opts.command != Command::parse && !update)
     {
       LOG_INFO << "NOTE: Binary MSA file already exists: " << binary_msa_fname << endl << endl;
     }
@@ -1267,7 +1267,8 @@ void write_binary_msa_file(RaxmlInstance& instance)
     {
       RBAStream bs(binary_msa_fname);
       bs << parted_msa;
-      LOG_INFO << "NOTE: Binary MSA file created: " << binary_msa_fname << endl << endl;
+      LOG_INFO << "NOTE: Binary MSA file " << (rba_exists ? "updated" : "created")
+               << ": " << binary_msa_fname << endl << endl;
     }
   }
 }
@@ -3767,9 +3768,11 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   if (!opts.redo_mode &&
       sysutil_file_exists(opts.checkp_file()) &&
       sysutil_file_exists(opts.binary_msa_file()) &&
-      RBAStream::rba_file(opts.binary_msa_file(), true))
+      RBAStream::rba_file(opts.binary_msa_file(), true) &&
+      !opts.auto_model())
   {
     instance.opts.msa_file = opts.binary_msa_file();
+    instance.opts.model_file = "";
     instance.opts.msa_format = FileFormat::binary;
   }
 
@@ -3845,6 +3848,9 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
                                           instance.num_threads_modeltest, instance.num_threads_modeltest);
     modeltest_thread_main();
     ParallelContext::finalize_threads();
+
+    /* save updated RBA with best-fit model */
+    write_binary_msa_file(instance, true);
   }
 
   ParallelContext::init_pthreads(opts, std::bind(thread_main,

@@ -248,6 +248,7 @@ const vector<Model>& ModelTest::optimize_model()
 
       best_model_per_part.emplace_back(best_model->model);
     }
+    LOG_INFO << endl;
   }
 
   thread_log->close();
