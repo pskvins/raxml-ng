@@ -81,6 +81,41 @@ void CheckpointFile::write_tmp_bs_tree(const Tree& tree) const
     write_tmp_tree(tree, opts.tmp_bs_trees_file(), true);
 }
 
+void CheckpointFile::reset_search_state()
+{
+  for (auto& ckp: checkp_list)
+    ckp.reset_search_state();
+}
+
+bool CheckpointFile::compatible(const Options& old_opts, bool throw_error) const
+{
+  if (!opts.safety_checks.isset(SafetyCheck::ckp_options))
+    return true;
+
+  std::string errfield = "";
+  std::string ckp_val  = "";
+  std::string cmd_val  = "";
+  if (!opts.model_file.empty() && opts.model_file != old_opts.model_file)
+  {
+    errfield = "model";
+    ckp_val = old_opts.model_file;
+    cmd_val = opts.model_file;
+  }
+
+  if (opts.command != old_opts.command)
+  {
+    errfield = "command";
+    ckp_val = "--" + CommandNames[static_cast<size_t>(old_opts.command)];
+    cmd_val = "--" + CommandNames[static_cast<size_t>(opts.command)];
+  }
+
+  if (!errfield.empty() && throw_error)
+    throw incompatible_checkpoint_error(errfield, ckp_val, cmd_val);
+
+  return errfield.empty();
+}
+
+
 CheckpointManager::CheckpointManager(const Options& opts) :
     _active(opts.nofiles_mode ? false : true), _ckp_fname(opts.checkp_file()), timestamp_last_checkpoint{}
 {
@@ -158,10 +193,15 @@ bool CheckpointManager::read(const std::string& ckp_fname)
 
       return true;
     }
+    catch (incompatible_checkpoint_error& e)
+    {
+      /* checkpoint invalid since command line has changed -> exit with error */
+      throw e;
+    }
     catch (runtime_error& e)
     {
-      if (ParallelContext::group_master_thread())
-        checkpoint().reset_search_state();
+      /* checkpoint corrupted etc. -> ignore and start analysis from scratch */
+      _checkp_file.reset_search_state();
       LOG_DEBUG << "Error reading checkpoint: " << e.what() << endl;
       return false;
     }
@@ -474,7 +514,10 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, CheckpointFile& ckpfile
   {
     stream >> ckpfile.consumed_wh;
 
-    stream >> ckpfile.opts;
+    Options ckp_opts;
+    stream >> ckp_opts;
+    if (ckpfile.compatible(ckp_opts, true))
+      ckpfile.opts = ckp_opts;
   }
 
   if (ckpfile.version > 5)

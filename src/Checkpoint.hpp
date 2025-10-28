@@ -50,6 +50,24 @@ struct SearchState
   int slow_spr_radius;
 };
 
+class checkpoint_error : public runtime_error
+{
+public:
+  checkpoint_error(const std::string& msg = "") : std::runtime_error("Failed to load checkpoint!\n" + msg) {};
+};
+
+class incompatible_checkpoint_error : public checkpoint_error
+{
+public:
+  incompatible_checkpoint_error(const std::string& field,
+                                const std::string& ckp_val = "", const std::string& cmd_val = "") :
+    checkpoint_error("Incompatible values for '" + field + "'" +
+                     (ckp_val.empty() ? "." : ": checkpoint = " + ckp_val + ", cmdline = " + cmd_val) +
+                     "\nRemove the checkpoint file or re-run with --redo option.")
+    {};
+};
+
+
 struct Checkpoint
 {
   Checkpoint() : search_state(), tree_index(0), tree(), models(), last_loglh(0.), lh_epsilon(0.){}
@@ -96,6 +114,13 @@ struct CheckpointFile
   void write_tmp_best_tree() const;
   void write_tmp_ml_tree(const Tree& tree) const;
   void write_tmp_bs_tree(const Tree& tree) const;
+
+  void reset_search_state();
+
+  /* Return TRUE if current options (opts) are compatible with options stored in a checkpoint (old_opts).
+   * This allows to identify command line changes that make restarting from a checkpoint impossible.
+   * In such a case, the function will either return FALSE (default), or throw an exception. */
+  bool compatible(const Options& old_opts, bool throw_error = false) const;
 };
 
 class CheckpointManager

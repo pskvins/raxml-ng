@@ -216,7 +216,7 @@ void init_part_info(RaxmlInstance& instance)
           "per-site likelihood mode, sorry!\n       Please use PHYLIP/FASTA instead.");
     }
 
-    if (!opts.model_file.empty())
+    if (!opts.model_file.empty() && !opts.auto_model())
     {
       LOG_WARN <<
           "WARNING: The model you specified on the command line (" << opts.model_file <<
@@ -1420,9 +1420,11 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type, int random_
   return tree;
 }
 
-void load_start_trees(RaxmlInstance& instance)
+void load_start_trees(RaxmlInstance& instance, bool assert_count = false)
 {
-  NewickStream ts(instance.opts.start_tree_file(), std::ios::in);
+  const auto& opts = instance.opts;
+
+  NewickStream ts(opts.start_tree_file(), std::ios::in);
   size_t i = 0;
   while (ts.peek() != EOF)
   {
@@ -1430,22 +1432,29 @@ void load_start_trees(RaxmlInstance& instance)
     ts >> tree;
     i++;
 
-    if (instance.opts.brlen_reset_usertree)
+    if (opts.brlen_reset_usertree)
       tree.reset_brlens();
 
     prepare_tree(instance, tree);
     instance.start_trees.emplace_back(tree);
   }
 
-  if (instance.opts.start_trees.count(StartingTree::user) > 0)
+  if (opts.start_trees.count(StartingTree::user) > 0)
   {
     // in case of user starting trees, we do not know num_searches
     // until we read trees from the file. that's why we update num_searches here.
-    assert(i >= instance.opts.num_searches);
+    assert(i >= opts.num_searches);
     instance.opts.num_searches = i;
   }
-  else
-    assert(i == instance.opts.num_searches);
+  else if (i != opts.num_searches)
+  {
+    if (assert_count)
+       assert(i == opts.num_searches);
+    else if (opts.safety_checks.isset(SafetyCheck::ckp_start_trees))
+      throw runtime_error("Invalid number of starting trees in " + opts.start_tree_file() + "\n"
+                          "Found: " +  to_string(i) + ", expected: " + to_string(opts.num_searches) +
+                          "\n\nHINT:  Have you forgot --redo?");
+  }
 }
 
 void load_checkpoint(RaxmlInstance &instance, CheckpointManager &cm)
@@ -1462,7 +1471,7 @@ void load_checkpoint(RaxmlInstance &instance, CheckpointManager &cm)
 
   if (cm.read())
   {
-    LOG_DEBUG << "NOTE: Loaded checkpoint file: " << instance.opts.checkp_file() << endl;
+    LOG_INFO << "NOTE: Loaded checkpoint file: " << instance.opts.checkp_file() << endl;
   }
 }
 
@@ -3768,11 +3777,11 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
   if (!opts.redo_mode &&
       sysutil_file_exists(opts.checkp_file()) &&
       sysutil_file_exists(opts.binary_msa_file()) &&
-      RBAStream::rba_file(opts.binary_msa_file(), true) &&
-      !opts.auto_model())
+      RBAStream::rba_file(opts.binary_msa_file(), true))
   {
     instance.opts.msa_file = opts.binary_msa_file();
-    instance.opts.model_file = "";
+    if (!instance.opts.auto_model())
+      instance.opts.model_file = "";
     instance.opts.msa_format = FileFormat::binary;
   }
 
@@ -3816,7 +3825,7 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
     {
       /* non-master ranks load starting trees from a file */
       ParallelContext::global_mpi_barrier();
-      load_start_trees(instance);
+      load_start_trees(instance, true);
     }
   }
 
