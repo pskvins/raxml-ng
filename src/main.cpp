@@ -924,6 +924,12 @@ void check_options_early(Options& opts)
              << endl << endl;
     opts.stopping_rule = StoppingRule::none;
   }
+
+  if (opts.command == Command::modeltest && opts.num_workers > 1)
+  {
+    LOG_WARN << endl << "WARNING: The --workers option is ignored in model selection mode."
+             << endl << endl;
+  }
 }
 
 void check_options(RaxmlInstance& instance)

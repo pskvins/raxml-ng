@@ -257,12 +257,6 @@ void CommandLineParser::check_options(Options &opts)
                             "it is supported, please use --force option to disable this check.");
     }
   }
-
-  if (opts.command == Command::modeltest && opts.num_workers > 1)
-  {
-    throw OptionException("Model testing currently does not work with parallel tree searches. "
-        "Please use only a single worker.");
-  }
 }
 
 void CommandLineParser::compute_num_searches(Options &opts)
@@ -855,6 +849,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           throw InvalidOptionValueException("Invalid number of threads: %s " + string(optarg) +
                                             ", please provide a positive integer number or `auto`!");
         }
+        /* if fixed number of threads is given, we should never exceed it */
+        if (opts.num_threads > 0)
+          opts.num_threads_max = opts.num_threads;
         break;
       case 20: /* SIMD instruction set */
         if (strcasecmp(optarg, "none") == 0 || strcasecmp(optarg, "scalar") == 0)
