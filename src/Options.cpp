@@ -689,12 +689,12 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       stream << "user-specified";
     stream << ")" << endl;
   }
-  stream << "  FreeRate Optimization Method: " << opts.free_rate_opt_method_name() << endl;
+  stream << "  FreeRate optimization method: " << opts.free_rate_opt_method_name() << endl;
 
   if (opts.auto_model())
   {
-    stream << "  Modeltest Information Criterion: " << opts.ic_name() << endl;
-    stream << "  Modeltest Heuristics: ";
+    stream << "  model selection information criterion: " << opts.ic_name() << endl;
+    stream << "  model selection heuristics: ";
 
     for (const auto &heuristic : opts.modeltest_heuristics)
     {
@@ -702,9 +702,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       {
 
         case HeuristicType::FREERATE:
-          stream << "Freerate "; break;
+          stream << "FreeRate "; break;
         case HeuristicType::RHAS:
-          stream << "RHAS(Δ=" << opts.modeltest_significant_ic_delta 
+          stream << "RHAS(ic-delta=" << opts.modeltest_significant_ic_delta
               << ", mode=" << (opts.modeltest_rhas_heuristic_mode == RHASHeuristicMode::AllSignficantCategoryCounts ? "all significant" : "only optimal")
               << ") ";
           break;
@@ -720,7 +720,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
 
     if (!opts.modeltest_subst_models.empty())
     {
-      stream << "  Modeltest Substitution Models: ";
+      stream << "  model selection substitution models: ";
       for (const auto &m : opts.modeltest_subst_models)
       {
         stream << m << " ";
@@ -728,7 +728,7 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       stream << endl;
     }
 
-    stream << "  Modeltest RHAS: ";
+    stream << "  model selection RHAS: ";
     for (const auto &r : opts.modeltest_rhas)
     {
       const auto &label = rate_heterogeneity_label.at(static_cast<size_t>(r));

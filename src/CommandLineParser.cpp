@@ -102,10 +102,11 @@ static struct option long_options[] =
   {"stop-rule",          required_argument, 0, 0 },  /*  69 */
   {"ebg",                no_argument,       0, 0 },  /*  70 */
   {"fast",               no_argument,       0, 0 },  /*  71 */
-  {"modeltest",          optional_argument, 0, 0 },  /*  72 */
-  {"modeltest-options",  required_argument, 0, 0 },  /*  73 */
-  {"opt-freerate",       required_argument, 0, 0 },  /*  74 */
-  {"gcf",                optional_argument, 0, 0 },  /*  75 */
+  {"opt-freerate",       required_argument, 0, 0 },  /*  72 */
+  {"gcf",                optional_argument, 0, 0 },  /*  73 */
+  {"modeltest",          optional_argument, 0, 0 },  /*  74 */
+  {"moose",              optional_argument, 0, 0 },  /*  75 */
+  {"moose-options",      required_argument, 0, 0 },  /*  76 */
 
   { 0, 0, 0, 0 }
 };
@@ -1496,18 +1497,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.use_pythia = false;
         opts.use_pars_spr = true;
         break;
-      case 72: /* model test */
-        opts.command = Command::modeltest;
-        if (optarg)
-          optarg_modeltest = optarg;
-        if (optarg_tree.empty())
-          optarg_tree = "pars{1}";
-        num_commands++;
-        break;
-      case 73: /* modeltest options */
-        optarg_modeltest = optarg;
-        break;
-      case 74: /* freerate optimization method */
+      case 72: /* freerate optimization method */
         if (strcasecmp(optarg, "em") == 0) {
           opts.free_rate_opt_method = FreerateOptMethod::EM;
         } else if (strcasecmp(optarg, "lbfgsb") == 0 || strcasecmp(optarg, "bfgs") == 0) {
@@ -1517,7 +1507,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         } else
           throw InvalidOptionValueException("Unknown FreeRate optimization method: " + string(optarg));
         break;
-      case 75: /* gcf: compute gene concordance factors */
+      case 73: /* gcf: compute gene concordance factors */
         opts.command = Command::support;
         opts.bs_metrics.clear();
         opts.bs_metrics.insert(BranchSupportMetric::gcf);
@@ -1526,6 +1516,18 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         if (optarg)
           optarg_tree = optarg;
         num_commands++;
+        break;
+      case 74: /* modeltest (for backward-compatibility) */
+      case 75: /* model selection / moose */
+        opts.command = Command::modeltest;
+        if (optarg)
+          optarg_modeltest = optarg;
+        if (optarg_tree.empty())
+          optarg_tree = "pars{1}";
+        num_commands++;
+        break;
+      case 76: /* model selection options */
+        optarg_modeltest = optarg;
         break;
       default:
         throw  OptionException("Internal error in option parsing");
@@ -1622,7 +1624,7 @@ void CommandLineParser::print_help()
             "  --ancestral                                ancestral state reconstruction at all inner nodes\n"
             "  --sitelh                                   print per-site log-likelihood values\n"
             "  --pythia                                   compute and print Pythia MSA difficulty score\n"
-            "  --modeltest [ OPTIONS ]                    select best-fit model of sequence evolution (OPTIONS: see below)\n"
+            "  --moose [ OPTIONS ]                        select best-fit MOdel Of Sequence Evolution (OPTIONS: see below)\n"
             "\n"
             "Command shortcuts (mutually exclusive):\n"
             "  --search1                                  Alias for: --search --tree pars{1}\n"
@@ -1679,7 +1681,7 @@ void CommandLineParser::print_help()
             "  --opt-freerate em | lbfgsb                 optimization method for FreeRates (default: lbfgsb)\n"
             "\n"
             "Model selection options:\n"
-            "  --modeltest-options OPT=VAL/OPT=VAL/...    list of model testing options separated by '/'\n"
+            "  --moose-options OPT=VAL/OPT=VAL/...        list of MOdel Optimization and SElection options separated by '/'\n"
             "      criterion=AIC | AICc | BIC             information criterion to use for model selection (default: BIC)\n"
             "      ic-delta=VALUE                         significance threshold for IC score difference (default: 10.0)\n"
             "      freerate-categories=n[-m]              test FreeRate models with n categories (optionally up to and including m)\n"

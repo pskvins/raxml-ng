@@ -278,7 +278,7 @@ void init_part_info(RaxmlInstance& instance)
     else if (opts.data_type == DataType::binary || opts.model_file == "BIN")
        dummy_model = "BIN+G";
     else
-      throw runtime_error("Specify the datatype for modeltesting with --data-type [AA|DNA|BIN]");
+      throw runtime_error("Specify the datatype for model selection with --data-type [AA|DNA|BIN]");
     parted_msa.init_single_model(opts.data_type, dummy_model);
     opts.model_file = "auto";
   }
@@ -2215,7 +2215,7 @@ void init_modeltest(RaxmlInstance& instance, CheckpointManager &cm)
   }
   assert(instance.num_threads_modeltest > 0);
 
-  LOG_INFO << "\nStarting ModelTest with " << tree_type << " starting tree using "
+  LOG_INFO << "\nStarting model selection with " << tree_type << " starting tree using "
            << instance.num_threads_modeltest << " threads" << endl << endl;
 }
 
