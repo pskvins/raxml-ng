@@ -623,7 +623,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
 
   if (opts.command == Command::bootstrap || opts.command == Command::all ||
       opts.command == Command::search || opts.command == Command::evaluate ||
-      opts.command == Command::parse || opts.command == Command::ancestral)
+      opts.command == Command::parse || opts.command == Command::ancestral ||
+      opts.command == Command::modeltest)
   {
     stream << "  tip-inner: " << (opts.use_tip_inner ? "ON" : "OFF") << endl;
     stream << "  pattern compression: " << (opts.use_pattern_compression ? "ON" : "OFF") << endl;
@@ -688,8 +689,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
     else
       stream << "user-specified";
     stream << ")" << endl;
+
+    stream << "  FreeRate optimization method: " << opts.free_rate_opt_method_name() << endl;
   }
-  stream << "  FreeRate optimization method: " << opts.free_rate_opt_method_name() << endl;
 
   if (opts.auto_model())
   {

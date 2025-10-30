@@ -1715,7 +1715,7 @@ void CommandLineParser::print_help()
   cout << "\n"
             "EXAMPLES:\n"
             "  1. Perform tree inference on DNA alignment \n"
-            "     (select best-fit model, adaptive search heuristic based on MSA difficulty\n"
+            "     (select best-fit model, adaptive search heuristic based on MSA difficulty):\n"
             "\n"
             "     ./raxml-ng --msa testDNA.fa --model DNA\n"
             "\n";

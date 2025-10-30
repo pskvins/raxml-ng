@@ -3168,6 +3168,8 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
       LOG_INFO << "Model testing results saved to: " << sysutil_realpath(opts.modeltest_xml_file()) << endl;
     if (!opts.modeltest_best_model_file().empty())
       LOG_INFO << "Best-fit model saved to: " << sysutil_realpath(opts.modeltest_best_model_file()) << endl;
+    if (!opts.binary_msa_file().empty())
+      LOG_INFO << "Binary MSA file saved to: " << sysutil_realpath(opts.binary_msa_file()) << endl;
   }
 
   if (opts.command == Command::pythia)
