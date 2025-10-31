@@ -1442,7 +1442,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.topology_opt_method = TopologyOptMethod::rapidBS;
         else if (strcasecmp(optarg, "nni-round") == 0 || strcasecmp(optarg, "nni") == 0)
           opts.topology_opt_method = TopologyOptMethod::nniRound;
-        else if (strcasecmp(optarg, "simplified") == 0 || strcasecmp(optarg, "sRAxML-NG") == 0){
+        else if (strncasecmp(optarg, "simpl", 5) == 0 || strcasecmp(optarg, "sRAxML-NG") == 0){
           opts.topology_opt_method = TopologyOptMethod::simplified;
           opts.use_pythia = false;
         } else if (strcasecmp(optarg, "adafast") == 0) {
@@ -1688,12 +1688,13 @@ void CommandLineParser::print_help()
             "\n"
             "Topology search options:\n"
             "  --opt-topology        classic | adaptive   topology optimization method (default: adaptive)\n"
-            "                        nni | rbs | off      \n"
+            "                        simple  | nni        \n"
+            "                        rbs | off            \n"
             "  --adaptive            [ on | off | start ] adaptive ML tree search (start = starting trees only)\n"
             "  --spr-radius          VALUE                SPR re-insertion radius for fast iterations (default: AUTO)\n"
             "  --spr-cutoff          VALUE | off          relative LH cutoff for descending into subtrees (default: 1.0)\n"
             "  --lh-epsilon-triplet  VALUE                log-likelihood epsilon for branch length triplet optimization (default: 1000)\n"
-            "  --stop-rule           sn-rell | sn-nprmal  stopping criterion for SPR rounds (default: kh)\n"
+            "  --stop-rule           sn-rell | sn-normal  stopping criterion for SPR rounds (default: OFF)\n"
             "                        kh | kh-mult | off   \n"
             "\n"
             "Bootstrapping and branch support options:\n"

@@ -4,7 +4,9 @@
 
 #include "util/EnergyMonitor.hpp"
 
+#if defined(__linux__)
 #include <malloc.h>
+#endif
 
 using namespace std;
 
@@ -263,7 +265,10 @@ void ParallelContext::finalize_threads(bool force)
   _threads.clear();
 
 //  /* IMPORTANT: ensure that no memory is blocked by dead threads */
+#if defined(__linux__)
   malloc_trim(0);
+#endif
+
 #else
   RAXML_UNUSED(force);
 #endif
