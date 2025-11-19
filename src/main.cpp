@@ -1117,7 +1117,7 @@ void autotune_threads(RaxmlInstance& instance)
   assert(opts.num_threads % workers_per_rank == 0);
 
   auto threads_per_worker = opts.num_threads * num_ranks / opts.num_workers;
-  LOG_INFO << "Parallelization scheme autoconfig: " << opts.num_workers << " worker(s) x "
+  LOG_INFO << "\nParallelization scheme for tree search (auto): " << opts.num_workers << " worker(s) x "
            << threads_per_worker << " thread(s)" << endl << endl;
 }
 

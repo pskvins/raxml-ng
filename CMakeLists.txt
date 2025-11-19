@@ -6,7 +6,6 @@ set(CMAKE_DISABLE_SOURCE_CHANGES  ON)
 set(RAXML_BINARY_NAME "raxml-ng-2" CACHE STRING "Custom RAxML-NG binary name")
 set(USE_CORAXLIB_CMAKE ON CACHE BOOL "Use CMake to build Coraxlib")
 set(BUILD_AS_LIBRARY OFF CACHE BOOL "Build RAxML-NG as shared library (instead of stand-alone executable)")
-set(PLLMOD_DEBUG OFF CACHE BOOL "Debug pll-modules (tons of console output!)")
 
 set (USE_PTHREADS ON CACHE BOOL "Enable multi-threading support (PTHREADS)")
 set (USE_MPI OFF CACHE BOOL "Enable MPI support")
@@ -17,6 +16,7 @@ set (HTSLIB_DIR "" CACHE STRING "Path to htslib")
 # build a static binary
 set(STATIC_BUILD OFF CACHE BOOL "Build static binary")
 set(PORTABLE_BUILD OFF CACHE BOOL "Build a portable RAxML-NG binary (slightly slower)")
+set(BUILD_TESTS OFF CACHE BOOL "Build unit tests (requires GoogleTest)")
 
 set(USE_TERRAPHAST OFF CACHE BOOL "Use phylogentic terraces library (terraphast) ")
 set(USE_GMP OFF CACHE BOOL "Use GNU Multiple precision (GMP) library ")
@@ -157,5 +157,8 @@ endif()
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)
 
-enable_testing()
-add_subdirectory(${PROJECT_SOURCE_DIR}/test/src)
+if (BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(${PROJECT_SOURCE_DIR}/test/src)
+endif (BUILD_TESTS)
+
