@@ -35,7 +35,7 @@ log_level(LogLevel::progress), msa_format(FileFormat::autodetect), data_type(Dat
 random_seed(0), start_trees(), lh_epsilon(DEF_LH_EPSILON), lh_epsilon_brlen_triplet(DEF_LH_EPSILON_BRLEN_TRIPLET),
 spr_radius(-1), spr_cutoff(1.0),
 brlen_linkage(CORAX_BRLEN_SCALED), brlen_opt_method(CORAX_OPT_BLO_NEWTON_FAST),
-brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX), brlen_reset_usertree(false),
+brlen_min(RAXML_BRLEN_MIN), brlen_max(RAXML_BRLEN_MAX), brlen_reset_usertree(false), use_pars_brlen(true),
 num_searches(1), terrace_maxsize(100),
 num_bootstraps(1000), bootstop_criterion(BootstopCriterion::none), bootstop_cutoff(RAXML_BOOTSTOP_CUTOFF),
 bootstop_interval(RAXML_BOOTSTOP_INTERVAL), bootstop_permutations(RAXML_BOOTSTOP_PERMUTES),
@@ -553,7 +553,8 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
         stream << "random" << " (" << it->second << ")";
         break;
       case StartingTree::parsimony:
-        stream << "parsimony" << (opts.use_pars_spr ? "+SPR" : "") << " (" << it->second << ")";
+        stream << "parsimony" << (opts.use_pars_spr ? "+SPR" : "") << (opts.use_pars_brlen ? "+BRLEN" : "")
+               << " (" << it->second << ")";
         break;
       case StartingTree::user:
         stream << "user";

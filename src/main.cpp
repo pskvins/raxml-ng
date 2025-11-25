@@ -1390,7 +1390,7 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type, int random_
         tree = Tree::buildRandomConstrained(parted_msa.taxon_names(), random_seed,
                                             instance.constraint_tree);
 
-      LOG_VERB_TS << "Generating a RANDOM starting tree, seed: " << random_seed << endl;
+      LOG_VERB_TS << "Generated a RANDOM starting tree, seed: " << random_seed << endl;
 
       break;
     case StartingTree::parsimony:
@@ -1410,8 +1410,13 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type, int random_
       tree = Tree::buildParsimonyConstrained(pars_msa, random_seed, opts.use_pars_spr, &score,
                                              instance.constraint_tree, instance.tip_msa_idmap);
 
+      double avg_pars_brlen = ((double) score) / tree.num_branches() / pars_msa.part_msa().total_sites();
+
+      if (opts.use_pars_brlen)
+        tree.reset_brlens(avg_pars_brlen);
+
       LOG_WORKER_TS(LogLevel::verbose) << "Generated a PARSIMONY starting tree, seed: " << random_seed <<
-          ", score: " << score << endl;
+          ", score: " << score << ", avg_brlen: " << FMT_BL(avg_pars_brlen) << endl;
 
       break;
     }

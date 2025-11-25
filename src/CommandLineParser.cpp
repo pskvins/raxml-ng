@@ -1182,6 +1182,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.brlen_reset_usertree = true;
             else if (eopt == "brlen-keep")
               opts.brlen_reset_usertree = false;
+            else if (eopt == "brlen-start-pars")
+              opts.use_pars_brlen = true;
+            else if (eopt == "brlen-start-fixed")
+              opts.use_pars_brlen = false;
             else if (eopt == "newick-stream")
               opts.use_tree_streaming = true;
             else if (eopt == "compat-v11")

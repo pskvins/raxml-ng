@@ -106,6 +106,7 @@ public:
   double brlen_min;
   double brlen_max;
   bool brlen_reset_usertree;
+  bool use_pars_brlen;
 
   unsigned int num_searches;
   unsigned long long terrace_maxsize;
