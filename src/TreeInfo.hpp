@@ -69,6 +69,8 @@ public:
            const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,
            size_t partition_id, const Model &model);
 
+  TreeInfo(TreeInfo&& other) noexcept;
+
   virtual
   ~TreeInfo ();
 
