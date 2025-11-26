@@ -69,8 +69,14 @@ public:
            const IDVector &tip_msa_idmap, const PartitionAssignment &part_assign,
            size_t partition_id, const Model &model);
 
+  TreeInfo(TreeInfo&& other) noexcept;
+
   virtual
   ~TreeInfo ();
+
+  TreeInfo(const TreeInfo&) = delete;            // disable copy-construction (the corax-allocation prevents copying)
+
+  TreeInfo& operator=(const TreeInfo&) = delete; // disable copy-assignment (the corax-allocation prevents copying)
 
   const corax_treeinfo_t &pll_treeinfo() const { return *_pll_treeinfo; }
 

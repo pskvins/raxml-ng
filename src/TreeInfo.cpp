@@ -34,6 +34,23 @@ TreeInfo::TreeInfo(const Options &opts, const Tree &tree, const PartitionedMSA &
   init(opts, tree, parted_msa, tip_msa_idmap, part_assign, std::vector<uintVector>(), partition_id, model);
 }
 
+TreeInfo::TreeInfo(TreeInfo &&other) noexcept : _pll_treeinfo(std::move(other._pll_treeinfo)),
+                                                _parts_master(std::move(other._parts_master)),
+                                                _brlen_opt_method(std::move(other._brlen_opt_method)),
+                                                _brlen_min(std::move(other._brlen_min)),
+                                                _brlen_max(std::move(other._brlen_max)),
+                                                _check_lh_impr(std::move(other._check_lh_impr)),
+                                                _use_old_constraint(std::move(other._use_old_constraint)),
+                                                _use_spr_fastclv(std::move(other._use_spr_fastclv)),
+                                                _lh_epsilon(std::move(other._lh_epsilon)),
+                                                _param_epsilon(std::move(other._param_epsilon)),
+                                                _partition_contributions(std::move(other._partition_contributions)),
+                                                _freerate_opt(std::move(other._freerate_opt)),
+                                                _param_opt_order(std::move(other._param_opt_order)) {
+  // take ownership of the corax allocation
+  other._pll_treeinfo = nullptr;
+}
+
 // modeltest edition
 // TODO try to merge with regular init()
 void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA &parted_msa,
