@@ -7,8 +7,6 @@
 #include "AncestralStates.hpp"
 #include "loadbalance/PartitionAssignment.hpp"
 
-#define BLOCK_ID_PARTITION  101
-
 struct spr_round_params
 {
   bool thorough;
@@ -129,10 +127,6 @@ public:
 
 
   void custom_reduce(void *parallel_context, void (*parallel_reduce_cb)(void *, double *, size_t, int));
-
-  // int savePartition(const char* filename, int partIndex);
-
-  // corax_partition_t* loadPartition(const char* filename);
 
 private:
   corax_treeinfo_t *_pll_treeinfo;

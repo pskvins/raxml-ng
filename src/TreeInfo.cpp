@@ -46,7 +46,8 @@ TreeInfo::TreeInfo(TreeInfo &&other) noexcept : _pll_treeinfo(std::move(other._p
                                                 _param_epsilon(std::move(other._param_epsilon)),
                                                 _partition_contributions(std::move(other._partition_contributions)),
                                                 _freerate_opt(std::move(other._freerate_opt)),
-                                                _param_opt_order(std::move(other._param_opt_order)) {
+                                                _param_opt_order(std::move(other._param_opt_order))
+{
   // take ownership of the corax allocation
   other._pll_treeinfo = nullptr;
 }
@@ -57,7 +58,8 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
                     const IDVector &tip_msa_idmap,
                     const PartitionAssignment &part_assign,
                     const std::vector<uintVector> &site_weights,
-                    size_t single_partition_id, const Model &model) {
+                    size_t single_partition_id, const Model &model)
+{
   _brlen_min = opts.brlen_min;
   _brlen_max = opts.brlen_max;
   _brlen_opt_method = opts.brlen_opt_method;
@@ -137,7 +139,8 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
                     const IDVector &tip_msa_idmap,
                     const PartitionAssignment &part_assign,
                     const std::vector<uintVector> &site_weights,
-                    const Model *override_model) {
+                    const Model *override_model)
+{
   _brlen_min = opts.brlen_min;
   _brlen_max = opts.brlen_max;
   _brlen_opt_method = opts.brlen_opt_method;
@@ -233,7 +236,8 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
     c /= total_weight;
 }
 
-TreeInfo::~TreeInfo() {
+TreeInfo::~TreeInfo()
+{
   if (_pll_treeinfo) {
     for (unsigned int i = 0; i < _pll_treeinfo->partition_count; ++i) {
       if (_pll_treeinfo->partitions[i])
@@ -245,7 +249,8 @@ TreeInfo::~TreeInfo() {
   }
 }
 
-void TreeInfo::assert_lh_improvement(double old_lh, double new_lh, const std::string &where) {
+void TreeInfo::assert_lh_improvement(double old_lh, double new_lh, const std::string &where)
+{
   if (_check_lh_impr && !(old_lh - new_lh < -new_lh * RAXML_LOGLH_TOLERANCE)) {
     throw runtime_error((where.empty() ? "" : "[" + where + "] ") +
                         "Worse log-likelihood after optimization!\n" +
@@ -256,7 +261,8 @@ void TreeInfo::assert_lh_improvement(double old_lh, double new_lh, const std::st
 }
 
 
-Tree TreeInfo::tree() const {
+Tree TreeInfo::tree() const
+{
   if (!_pll_treeinfo)
     return Tree();
 
@@ -278,7 +284,8 @@ Tree TreeInfo::tree() const {
   return tree;
 }
 
-Tree TreeInfo::tree(size_t partition_id) const {
+Tree TreeInfo::tree(size_t partition_id) const
+{
   if (!_pll_treeinfo)
     return Tree();
 
@@ -295,22 +302,26 @@ Tree TreeInfo::tree(size_t partition_id) const {
   return Tree(pll_utree);
 }
 
-void TreeInfo::tree(const Tree &tree) {
+void TreeInfo::tree(const Tree &tree)
+{
   _pll_treeinfo->root = corax_utree_graph_clone(&tree.pll_utree_root());
 }
 
-double TreeInfo::loglh(bool incremental) {
+double TreeInfo::loglh(bool incremental)
+{
   return corax_treeinfo_compute_loglh(_pll_treeinfo, incremental ? 1 : 0);
 }
 
-double TreeInfo::persite_loglh(std::vector<double *> part_site_lh, bool incremental) {
+double TreeInfo::persite_loglh(std::vector<double *> part_site_lh, bool incremental)
+{
   assert(part_site_lh.size() == _pll_treeinfo->partition_count);
   return corax_treeinfo_compute_loglh_persite(_pll_treeinfo, incremental ? 1 : 0, 1,
                                               part_site_lh.data());
 }
 
 
-void TreeInfo::model(size_t partition_id, const Model &model) {
+void TreeInfo::model(size_t partition_id, const Model &model)
+{
   if (partition_id >= _pll_treeinfo->partition_count)
     throw out_of_range("Partition ID out of range");
 
@@ -325,7 +336,8 @@ void TreeInfo::model(size_t partition_id, const Model &model) {
 
 //#define DBG printf
 
-double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor) {
+double TreeInfo::optimize_branches(double lh_epsilon, double brlen_smooth_factor)
+{
   /* update all CLVs and p-matrices before calling BLO */
   double new_loglh = loglh();
 
@@ -504,7 +516,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
 
 
 
-double TreeInfo::spr_round(spr_round_params &params) {
+double TreeInfo::spr_round(spr_round_params &params)
+{
   double loglh = corax_algo_spr_round(_pll_treeinfo, params.radius_min, params.radius_max,
                                params.ntopol_keep, params.thorough, _brlen_opt_method,
                                _brlen_min, _brlen_max, RAXML_BRLEN_SMOOTHINGS,
@@ -518,9 +531,10 @@ double TreeInfo::spr_round(spr_round_params &params) {
 
   libpll_check_error("ERROR in SPR round");
 
-  if(params.total_moves)
+  if (params.total_moves) {
     LOG_DEBUG << "SPR moves = " << (*params.total_moves) << 
-      ", Increasing moves = " << (*params.increasing_moves) << endl; 
+      ", Increasing moves = " << (*params.increasing_moves) << endl;
+  }
 
   assert(isfinite(loglh) && loglh);
 
@@ -544,7 +558,8 @@ double TreeInfo::nni_round(nni_round_params &params) {
   return loglh;
 }
 
-void TreeInfo::set_topology_constraint(const Tree &cons_tree) {
+void TreeInfo::set_topology_constraint(const Tree &cons_tree)
+{
   if (!cons_tree.empty()) {
     int retval = corax_treeinfo_set_constraint_tree(_pll_treeinfo, &cons_tree.pll_utree(),
                                                     _use_old_constraint ? 1 : 0);
@@ -555,7 +570,8 @@ void TreeInfo::set_topology_constraint(const Tree &cons_tree) {
 }
 
 void TreeInfo::compute_ancestral(const AncestralStatesSharedPtr &ancestral,
-                                 const PartitionAssignment &part_assign) {
+                                 const PartitionAssignment &part_assign)
+{
   corax_ancestral_t *pll_ancestral = corax_treeinfo_compute_ancestral(_pll_treeinfo);
 
   if (!pll_ancestral)
@@ -571,7 +587,8 @@ void TreeInfo::compute_ancestral(const AncestralStatesSharedPtr &ancestral,
   corax_treeinfo_destroy_ancestral(pll_ancestral);
 }
 
-void TreeInfo::sh_support(const sh_support_params &params, doubleVector &support_values) {
+void TreeInfo::sh_support(const sh_support_params &params, doubleVector &support_values)
+{
   double *supports = nullptr;
 
   /* only the master thread will store the support values */
@@ -597,7 +614,8 @@ void TreeInfo::sh_support(const sh_support_params &params, doubleVector &support
 }
 
 
-void assign(PartitionedMSA &parted_msa, const TreeInfo &treeinfo) {
+void assign(PartitionedMSA &parted_msa, const TreeInfo &treeinfo)
+{
   const corax_treeinfo_t &pll_treeinfo = treeinfo.pll_treeinfo();
 
   if (parted_msa.part_count() != pll_treeinfo.partition_count)
@@ -613,7 +631,8 @@ void assign(PartitionedMSA &parted_msa, const TreeInfo &treeinfo) {
   }
 }
 
-void assign(Model &model, const TreeInfo &treeinfo, size_t partition_id) {
+void assign(Model &model, const TreeInfo &treeinfo, size_t partition_id)
+{
   const corax_treeinfo_t &pll_treeinfo = treeinfo.pll_treeinfo();
 
   if (partition_id >= pll_treeinfo.partition_count)
@@ -628,7 +647,8 @@ void assign(Model &model, const TreeInfo &treeinfo, size_t partition_id) {
     model.brlen_scaler(pll_treeinfo.brlen_scalers[partition_id]);
 }
 
-void assign_models(TreeInfo &treeinfo, const ModelMap &models) {
+void assign_models(TreeInfo &treeinfo, const ModelMap &models)
+{
   const corax_treeinfo_t &pll_treeinfo = treeinfo.pll_treeinfo();
   for (auto &m: models) {
     if (!pll_treeinfo.partitions[m.first])
@@ -639,7 +659,8 @@ void assign_models(TreeInfo &treeinfo, const ModelMap &models) {
 }
 
 void build_clv(ProbVector::const_iterator probs, size_t sites, const WeightVector &weights, size_t seq_offset,
-               corax_partition_t *partition, bool normalize, std::vector<double> &clv) {
+               corax_partition_t *partition, bool normalize, std::vector<double> &clv)
+{
   const auto states = partition->states;
   auto clvp = clv.begin();
 
@@ -668,7 +689,8 @@ void build_clv(ProbVector::const_iterator probs, size_t sites, const WeightVecto
 
 void set_partition_tips(const Options &opts, const MSA &msa, const IDVector &tip_msa_idmap,
                         const PartitionRange &part_region,
-                        corax_partition_t *partition, const corax_state_t *charmap) {
+                        corax_partition_t *partition, const corax_state_t *charmap)
+{
   /* get "true" sequence offset considering that MSA can be partially loaded */
   auto seq_offset = msa.get_local_offset(part_region.start);
 
@@ -704,7 +726,8 @@ void set_partition_tips(const Options &opts, const MSA &msa, const IDVector &tip
 void set_partition_tips(const Options &opts, const MSA &msa, const IDVector &tip_msa_idmap,
                         const PartitionRange &part_region,
                         corax_partition_t *partition, const corax_state_t *charmap,
-                        const WeightVector &weights) {
+                        const WeightVector &weights)
+{
   assert(!weights.empty());
 
   const auto pstart = msa.get_local_offset(part_region.start);
@@ -755,7 +778,8 @@ void set_partition_tips(const Options &opts, const MSA &msa, const IDVector &tip
 
 corax_partition_t *create_pll_partition(const Options &opts, const MSA &msa, const Model &model,
                                         const IDVector &tip_msa_idmap,
-                                        const PartitionRange &part_region, const uintVector &weights) {
+                                        const PartitionRange &part_region, const uintVector &weights)
+{
   const auto pstart = msa.get_local_offset(part_region.start);
 
   //  printf("\n\n rank %lu, GLOBAL OFFSET %lu, LOCAL OFFSET %lu \n\n", ParallelContext::proc_id(), part_region.start, pstart);
@@ -833,86 +857,7 @@ corax_partition_t *create_pll_partition(const Options &opts, const MSA &msa, con
   return partition;
 }
 
-
-/*
-int TreeInfo::savePartition(const char* filename, int partIndex){
-    
-  int retval = CORAX_SUCCESS;
-  char *file = new char[strlen(filename)+1];
-  strcat(file,filename);
-
-  FILE * bin_file;
-  corax_binary_header_t bin_header;
-  const char * bin_fname = file;
-
-  bin_file = corax_binary_create(bin_fname, &bin_header, CORAX_BIN_ACCESS_SEQUENTIAL, 0);
-
-  if(!bin_file){
-      std::cout << "Error. Couldn't create bin file. Exit." << std::endl;
-      return CORAX_FAILURE;
-  }
-
-  if(!corax_binary_partition_dump(bin_file,
-                              BLOCK_ID_PARTITION,
-                              pll_treeinfo().partitions[partIndex],
-                              CORAX_BIN_ATTRIB_PARTITION_DUMP_CLV |
-                              CORAX_BIN_ATTRIB_PARTITION_DUMP_WGT))
-  {
-      std::cout << "Error. Couldn't dump partition. Exit" << std::endl;
-      return CORAX_FAILURE;
-  }
-
-  corax_binary_close(bin_file);
-  delete[] file;
-
-  return retval;
-
-}
-
-corax_partition_t* TreeInfo::loadPartition(const char* bin_fname){
-
-  corax_partition_t* _partition;
-  corax_binary_header_t input_header;
-  unsigned int bin_attributes = 0;
-  corax_block_map_t * block_map;
-  unsigned int n_blocks;
-
-  FILE * bin_file;
-
-  bin_file = corax_binary_open(bin_fname, &input_header);
-
-  block_map = corax_binary_get_map(bin_file, &n_blocks);
-
-  //printf("There are %d blocks in the map\n", n_blocks);
-  int partition_offset = 0;
-  for (unsigned int i=0; i<n_blocks; ++i)
-  {
-    // we cannot print the offset for the test since PATTERN_TIP
-    // affects the size of the CLVs
-    
-    //printf("%5ld\n", block_map[i].block_id);
-    
-    // printf("%5ld %20ld\n", block_map[i].block_id, block_map[i].block_offset);
-    //
-    if (block_map[i].block_id == BLOCK_ID_PARTITION)
-    {
-      partition_offset = block_map[i].block_offset;
-    }
-  }
-
-  // For the offset we can use the actual offset (from the block_map),
-  //   or CORAX_BIN_ACCESS_SEEK 
-  _partition = corax_binary_partition_load(bin_file,
-                                        BLOCK_ID_PARTITION,
-                                        NULL, // in order to create a new partition
-                                        &bin_attributes,
-                                        partition_offset);
-
-  //cout << "Done inside" << endl;
-  return _partition;
-} */
-
 void TreeInfo::custom_reduce(void *parallel_context, void (*parallel_reduce_cb)(void *, double *, size_t, int))
 {
-    corax_treeinfo_set_parallel_context(_pll_treeinfo, parallel_context, parallel_reduce_cb);
+  corax_treeinfo_set_parallel_context(_pll_treeinfo, parallel_context, parallel_reduce_cb);
 }

@@ -88,10 +88,9 @@ If still in doubt, please feel free to post to the [RAxML google group](https://
 ## Usage examples
 
   1. Perform single quick&dirty tree inference on DNA alignment 
-     (one parsimony starting tree, general time-reversible model, ML estimate of substitution rates and
-      nucleotide frequencies, discrete GAMMA model of rate heterogeneity with 4 categories):
+     (auto-select best-fit model, simplified search heuristic with early stopping):
 
-     `./raxml-ng --search1 --msa testDNA.fa --model GTR+G`
+     `./raxml-ng --fast --msa testDNA.fa --model DNA`
 
   2. Perform an all-in-one analysis (ML tree search + non-parametric bootstrap) 
      (10 randomized parsimony starting trees, fixed empirical substitution matrix (LG),
@@ -125,11 +124,11 @@ Alexey M. Kozlov, Diego Darriba, Tom&aacute;&scaron; Flouri, Benoit Morel, and A
 *Bioinformatics, 35 (21), 4453-4455* 
 doi:[10.1093/bioinformatics/btz305](https://doi.org/10.1093/bioinformatics/btz305)
 
-When using the **adaptive** tree search, please cite [Togkousidis et al. 2023](https://academic.oup.com/mbe/article/40/10/msad227/7296053):
+When using the **adaptive** tree search, please cite [(Togkousidis et al. 2023)](https://academic.oup.com/mbe/article/40/10/msad227/7296053)
 
-When using **Educated Bootstrap Guesser (EBG)**, please cite [Wiegert et al. 2024](https://doi.org/10.1093/molbev/msae215).
+When using **Educated Bootstrap Guesser (EBG)**, please cite [(Wiegert et al. 2024)](https://doi.org/10.1093/molbev/msae215)
 
-When using **Pythia difficulty prediction**, please cite [Haag & Stamatakis 2025](https://doi.org/10.1101/2025.03.25.645182).
+When using **Pythia difficulty prediction**, please cite [(Haag & Stamatakis 2025)](https://doi.org/10.1101/2025.03.25.645182)
 
 ## Developer team
 
