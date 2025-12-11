@@ -85,6 +85,7 @@ public:
   void weights(WeightVector&& v);
 
   void remove_sites(const std::vector<size_t>& site_indices);
+  void remove_taxa(const IDSet& taxon_ids);
 
   const RangeList& local_seq_ranges() const;
   size_t get_local_offset(size_t global_offset) const;

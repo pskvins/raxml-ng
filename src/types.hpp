@@ -169,6 +169,15 @@ enum class FreerateOptMethod
   LBFGSB
 };
 
+enum class AbnormalSequenceAction
+{
+  keep = 0,    /* keep & report */
+  regraft,     /* exclude & re-insert into the final tree */
+  remove,      /* remove & ignore */
+  error        /* exit with error */
+};
+
+
 const std::string ParamValueNames[] = {"undefined", "equal", "user", "model", "empirical", "ML"};
 
 typedef std::vector<double> doubleVector;

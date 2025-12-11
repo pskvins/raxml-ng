@@ -135,6 +135,8 @@ public:
 
   void reset_tip_ids(const NameIdMap& label_id_map);
   void reroot(const NameList& outgroup_taxa, bool add_root_node = false);
+  void remove_tips(const NameList& tips);
+  void insert_tips(const NameIdMap& tips, double brlen = 0.);
   void insert_tips_random(const NameList& tip_names, unsigned int random_seed = 0);
   void insert_tips_pasimony(const NameList& tip_names, std::vector<corax_partition*>& pars_partitions,
                             const IDVector& tip_msa_idmap,

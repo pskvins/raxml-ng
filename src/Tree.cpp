@@ -327,6 +327,82 @@ NameIdMap Tree::tip_ids() const
   return result;
 }
 
+void Tree::remove_tips(const NameList& tips)
+{
+  if (tips.empty())
+    return;
+
+  const auto old_tips = tip_ids();
+  std::vector<unsigned int> tip_ids;
+  for (const auto& t: tips)
+  {
+    if (old_tips.count(t))
+      tip_ids.push_back(old_tips.at(t));
+//    printf("%u  %s\n", tip_ids.back(), t.c_str());
+  }
+
+  /* all tips already in the tree -> nothing to do */
+  if (tip_ids.empty())
+    return;
+
+  int retval = corax_utree_remove_tips(_pll_utree.get(),
+                                       tip_ids.size(),
+                                       tip_ids.data(),
+                                       nullptr);
+
+  if (retval)
+  {
+    _pll_utree_tips.clear();
+    _num_tips = _pll_utree->tip_count;
+//    printf("new tree size: %u \n", _num_tips);
+  }
+  else
+  {
+    assert(corax_errno);
+    libpll_check_error("ERROR in removing tips from a corax_tree");
+  }
+}
+
+void Tree::insert_tips(const NameIdMap& tips, double brlen /* = 0. */)
+{
+  if (tips.empty())
+    return;
+
+  const auto old_tips = tip_ids();
+  std::vector<const char*> tip_labels;
+  std::vector<unsigned int> insert_nodes;
+  for (const auto& t: tips)
+  {
+    if (old_tips.count(t.first))
+      continue;
+    insert_nodes.push_back(t.second);
+    tip_labels.push_back(t.first.data());
+//    printf("%u  %s\n", insert_nodes.back(), tip_labels.back());
+  }
+  assert(tip_labels.size() == insert_nodes.size());
+
+  /* all tips already in the tree -> nothing to do */
+  if (insert_nodes.empty())
+    return;
+
+  int retval = corax_utree_insert_tips(_pll_utree.get(),
+                                       tip_labels.size(),
+                                       (const char * const*) tip_labels.data(),
+                                       insert_nodes.data(),
+                                       brlen);
+
+  if (retval)
+  {
+    _pll_utree_tips.clear();
+    _num_tips = _pll_utree->tip_count;
+  }
+  else
+  {
+    assert(corax_errno);
+    libpll_check_error("ERROR in inserting new tips into a corax_tree");
+  }
+}
+
 void Tree::insert_tips_random(const NameList& tip_names, unsigned int random_seed)
 {
   _pll_utree_tips.clear();

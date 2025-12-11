@@ -420,7 +420,9 @@ bool check_msa(RaxmlInstance& instance)
 
   vector<pair<size_t,size_t> > dup_taxa;
   vector<pair<size_t,size_t> > dup_seqs;
-  std::set<size_t> gap_seqs;
+  IDVector dups_to_remove;
+  IDSet seqs_to_remove;
+  IDSet gap_seqs;
 
   /* check taxon names for invalid characters */
   if (opts.safety_checks.isset(SafetyCheck::msa_names))
@@ -580,14 +582,32 @@ bool check_msa(RaxmlInstance& instance)
 
   if (!gap_seqs.empty())
   {
-   LOG_WARN << endl;
-   for (auto c : gap_seqs)
-   {
-     parted_msa_view.exclude_taxon(c);
-     LOG_VERB << "WARNING: Sequence #" << c+1 << " (" << parted_msa.taxon_names().at(c)
-              << ") contains only gaps!" << endl;
-   }
-   LOG_WARN << "WARNING: Fully undetermined sequences found: " << gap_seqs.size() << endl;
+    LOG_WARN << endl;
+    for (auto c : gap_seqs)
+    {
+      parted_msa_view.exclude_taxon(c);
+      LOG_VERB << "WARNING: Sequence #" << c+1 << " (" << parted_msa.taxon_names().at(c)
+               << ") contains only gaps!" << endl;
+    }
+    LOG_WARN << "WARNING: Fully undetermined sequences found: " << gap_seqs.size() << endl << endl;
+    switch (opts.allgap_seqs_action)
+    {
+      case AbnormalSequenceAction::keep:
+        LOG_INFO << "NOTE: Fully undetermined sequences were kept for the tree search." << endl;
+        break;
+      case AbnormalSequenceAction::regraft:
+      case AbnormalSequenceAction::remove:
+        seqs_to_remove.insert(gap_seqs.cbegin(), gap_seqs.cend());
+        LOG_INFO << "NOTE: Fully undetermined sequences were removed, "
+                 << (opts.allgap_seqs_action == AbnormalSequenceAction::regraft ?
+                       "but will be regrafted into" : "and will NOT appear in")
+                 << " the final tree." << endl;
+        break;
+      case AbnormalSequenceAction::error:
+        LOG_ERROR << "ERROR: Fully undetermined sequences found! " << endl;
+        msa_valid = false;
+        break;
+    }
   }
 
   if (!dup_seqs.empty())
@@ -602,12 +622,43 @@ bool check_msa(RaxmlInstance& instance)
 
       ++dup_count;
       parted_msa_view.exclude_taxon(p.second);
-      LOG_WARN << "WARNING: Sequences " << parted_msa.taxon_names().at(p.first) << " and " <<
-          parted_msa.taxon_names().at(p.second) << " are exactly identical!" << endl;
+      dups_to_remove.emplace_back(p.second);
+
+      const auto orig_taxon_name = parted_msa.taxon_names().at(p.first);
+      const auto dup_taxon_name = parted_msa.taxon_names().at(p.second);
+
+      if (opts.dup_seqs_action == AbnormalSequenceAction::regraft)
+        parted_msa.mark_dup_seq(dup_taxon_name, p.first);
+
+      LOG_WARN << "WARNING: Sequences " << orig_taxon_name << " and " << dup_taxon_name
+               << " are exactly identical!" << endl;
     }
     if (dup_count > 0)
-      LOG_WARN << "WARNING: Duplicate sequences found: " << dup_count << endl;
+    {
+      LOG_WARN << "WARNING: Duplicate sequences found: " << dup_count << endl << endl;
+      switch (opts.dup_seqs_action)
+      {
+        case AbnormalSequenceAction::keep:
+          LOG_INFO << "NOTE: Duplicate sequences were kept for the tree search." << endl;
+          break;
+        case AbnormalSequenceAction::regraft:
+        case AbnormalSequenceAction::remove:
+          seqs_to_remove.insert(dups_to_remove.cbegin(), dups_to_remove.cend());
+          LOG_INFO << "NOTE: Duplicate sequences were removed, "
+                   << (opts.dup_seqs_action == AbnormalSequenceAction::regraft ?
+                         "but will be regrafted into" : "and will not appear in")
+                   << " the final tree." << endl;
+          break;
+        case AbnormalSequenceAction::error:
+          LOG_ERROR << "ERROR: Duplicate sequences found! " << endl;
+          msa_valid = false;
+          break;
+      }
+    }
   }
+
+  if (!seqs_to_remove.empty())
+    parted_msa.remove_taxa(seqs_to_remove);
 
   if (!instance.opts.nofiles_mode && (msa_corrected || !parted_msa_view.identity()))
   {
@@ -942,7 +993,7 @@ void check_options(RaxmlInstance& instance)
     NameList missing_taxa;
     for (const auto& ot: opts.outgroup_taxa)
     {
-      if (!instance.parted_msa->taxon_id_map().count(ot))
+      if (!instance.parted_msa->has_taxon(ot, true))
         missing_taxa.push_back(ot);
     }
 
@@ -1333,6 +1384,47 @@ void autotune_start_trees(RaxmlInstance& instance)
 }
 
 
+void reroot_tree_with_outgroup(const Options& opts, Tree& tree, bool add_root_node)
+{
+  if (!opts.outgroup_taxa.empty())
+  {
+    try
+    {
+      tree.reroot(opts.outgroup_taxa, add_root_node);
+    }
+    catch (std::runtime_error& e)
+    {
+      if (corax_errno == CORAX_TREE_ERROR_POLYPHYL_OUTGROUP)
+        LOG_WARN << "WARNING: " << e.what() << endl << endl;
+      else
+        throw e;
+    }
+  }
+}
+
+void prune_duplicate_seqs(const RaxmlInstance& instance, Tree& tree)
+{
+  if (instance.parted_msa && !instance.parted_msa->dup_seq_map().empty())
+  {
+    NameList dup_tips;
+    for (const auto& t: instance.parted_msa->dup_seq_map())
+      dup_tips.emplace_back(t.first);
+    tree.remove_tips(dup_tips);
+  }
+}
+
+void regraft_duplicate_seqs(const RaxmlInstance& instance, Tree& tree)
+{
+  if (instance.parted_msa)
+    tree.insert_tips(instance.parted_msa->dup_seq_map());
+}
+
+void postprocess_tree(const RaxmlInstance& instance, Tree& tree)
+{
+  regraft_duplicate_seqs(instance, tree);
+  reroot_tree_with_outgroup(instance.opts, tree, true);
+}
+
 void prepare_tree(const RaxmlInstance& instance, Tree& tree)
 {
   /* fix missing & outbound branch lengths */
@@ -1364,6 +1456,8 @@ Tree generate_tree(const RaxmlInstance& instance, StartingTree type, int random_
 
       LOG_DEBUG << "Loaded user starting tree with " << tree.num_tips() << " taxa from: "
                            << opts.tree_file << endl;
+
+      prune_duplicate_seqs(instance, tree);
 
       if (opts.brlen_reset_usertree)
         tree.reset_brlens();
@@ -2230,30 +2324,6 @@ void init_modeltest(RaxmlInstance& instance, CheckpointManager &cm)
            << instance.num_threads_modeltest << " threads" << endl << endl;
 }
 
-void reroot_tree_with_outgroup(const Options& opts, Tree& tree, bool add_root_node)
-{
-  if (!opts.outgroup_taxa.empty())
-  {
-    try
-    {
-      tree.reroot(opts.outgroup_taxa, add_root_node);
-    }
-    catch (std::runtime_error& e)
-    {
-      if (corax_errno == CORAX_TREE_ERROR_POLYPHYL_OUTGROUP)
-        LOG_WARN << "WARNING: " << e.what() << endl << endl;
-      else
-        throw e;
-    }
-  }
-}
-
-void postprocess_tree(const Options& opts, Tree& tree)
-{
-  reroot_tree_with_outgroup(opts, tree, true);
-  // TODO: regraft previously removed duplicate seqs etc.
-}
-
 unsigned int read_newick_trees_custom(SplitsTree& ref_tree, const std::string& fname,
                                       const std::string& tree_kind, bool extract_splits,
                                       bool require_binary, bool require_complete,
@@ -2782,14 +2852,14 @@ void check_terrace(const RaxmlInstance& instance, const Tree& tree)
 #endif
 }
 
-void save_ml_trees(const Options& opts, const CheckpointFile& checkp)
+void save_ml_trees(const RaxmlInstance& instance, const CheckpointFile& checkp)
 {
-  NewickStream nw(opts.ml_trees_file(), std::ios::out);
+  NewickStream nw(instance.opts.ml_trees_file(), std::ios::out);
   for (auto& topol: checkp.ml_trees)
   {
     Tree ml_tree = checkp.tree();
     ml_tree.topology(topol.second.second);
-    postprocess_tree(opts, ml_tree);
+    postprocess_tree(instance, ml_tree);
     nw << ml_tree;
   }
 }
@@ -2860,12 +2930,14 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
 
     check_terrace(instance, best_tree);
 
-    postprocess_tree(opts, best_tree);
+    postprocess_tree(instance, best_tree);
 
+    // NOTE: collapse branches on full (with dups) but UNROOTED tree
+    regraft_duplicate_seqs(instance, collapsed_tree);
     collapsed_tree.collapse_short_branches(opts.brlen_min);
     if (!collapsed_tree.binary())
     {
-      postprocess_tree(opts, collapsed_tree);
+      postprocess_tree(instance, collapsed_tree);
 
       auto collapsed_count = best_tree.num_branches() - collapsed_tree.num_branches();
       LOG_WARN << "WARNING: Best ML tree contains " << collapsed_count << " near-zero branches!"
@@ -2909,7 +2981,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
 
     if (checkp.ml_trees.size() > 1 && !opts.ml_trees_file().empty())
     {
-      save_ml_trees(opts, checkp);
+      save_ml_trees(instance, checkp);
 
       LOG_INFO << "All ML trees saved to: " << sysutil_realpath(opts.ml_trees_file()) << endl;
     }
@@ -2921,7 +2993,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
 
     for (const auto& it: instance.support_trees)
     {
-      postprocess_tree(instance.opts, *it.second);
+      postprocess_tree(instance, *it.second);
 
       auto sup_file = opts.support_tree_file(it.first);
       if (!sup_file.empty())
@@ -3008,7 +3080,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
         {
           Tree bs_tree = checkp.tree();
           bs_tree.topology(topol.second.second);
-          postprocess_tree(opts, bs_tree);
+          postprocess_tree(instance, bs_tree);
           nw << bs_tree;
           ++bs_trees_written;
         }

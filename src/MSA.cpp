@@ -330,6 +330,34 @@ void MSA::remove_sites(const std::vector<size_t>& site_indices)
   _dirty = true;
 }
 
+void MSA::remove_taxa(const IDSet& taxon_ids)
+{
+  if (taxon_ids.empty())
+    return;
+
+  MSA::container new_sequences;
+  MSA::container new_labels;
+  _label_id_map.clear();
+  auto ignore = taxon_ids.cbegin();
+  for (size_t i = 0; i < _sequences.size(); ++i)
+  {
+    if (ignore == taxon_ids.cend() || i != *ignore)
+    {
+      new_sequences.push_back(_sequences[i]);
+      const auto label = _labels[i];
+      new_labels.push_back(label);
+      _label_id_map[label] = new_labels.size() - 1;
+    }
+    else
+      ignore++;
+  }
+
+  _sequences = std::move(new_sequences);
+  _labels = std::move(new_labels);
+
+  _dirty = true;
+}
+
 void MSA::update_num_sites()
 {
   if (!_weights.empty())

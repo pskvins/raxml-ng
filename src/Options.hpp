@@ -92,6 +92,9 @@ public:
   bool write_interim_results;
   bool write_bs_msa;
 
+  AbnormalSequenceAction allgap_seqs_action;
+  AbnormalSequenceAction dup_seqs_action;
+
   LogLevel log_level;
   FileFormat msa_format;
   DataType data_type;

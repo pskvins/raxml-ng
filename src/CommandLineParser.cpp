@@ -1056,6 +1056,9 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 38: /* constraint tree */
         opts.constraint_tree_file = optarg;
+        /* all-gap or duplicate taxa can be in constraint tree, so keep them */
+        opts.allgap_seqs_action = AbnormalSequenceAction::keep;
+        opts.dup_seqs_action = AbnormalSequenceAction::keep;
         break;
       case 39: /* no output files (only console output) */
         if (!optarg || strlen(optarg) == 0)
@@ -1186,6 +1189,20 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_pars_brlen = true;
             else if (eopt == "brlen-start-fixed")
               opts.use_pars_brlen = false;
+            else if (eopt == "seq-allgap-keep")
+              opts.allgap_seqs_action = AbnormalSequenceAction::keep;
+            else if (eopt == "seq-allgap-remove")
+              opts.allgap_seqs_action = AbnormalSequenceAction::remove;
+            else if (eopt == "seq-allgap-error")
+              opts.allgap_seqs_action = AbnormalSequenceAction::error;
+            else if (eopt == "seq-dup-keep")
+              opts.dup_seqs_action = AbnormalSequenceAction::keep;
+            else if (eopt == "seq-dup-regraft")
+              opts.dup_seqs_action = AbnormalSequenceAction::regraft;
+            else if (eopt == "seq-dup-remove")
+              opts.dup_seqs_action = AbnormalSequenceAction::remove;
+            else if (eopt == "seq-dup-error")
+              opts.dup_seqs_action = AbnormalSequenceAction::error;
             else if (eopt == "newick-stream")
               opts.use_tree_streaming = true;
             else if (eopt == "compat-v11")
@@ -1195,6 +1212,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_bs_pars = false;
               opts.use_par_pars = false;
               opts.use_pythia = false;
+              opts.allgap_seqs_action = AbnormalSequenceAction::keep;
+              opts.dup_seqs_action = AbnormalSequenceAction::keep;
               opts.stopping_rule = StoppingRule::none;
               opts.topology_opt_method = TopologyOptMethod::classic;
               if (!lh_epsilon_set)

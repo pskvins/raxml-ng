@@ -16,6 +16,7 @@ PartitionedMSA& PartitionedMSA::operator=(PartitionedMSA&& other)
   _full_msa = std::move(other._full_msa);
   _taxon_names = std::move(other._taxon_names);
   _taxon_id_map = std::move(other._taxon_id_map);
+  _dup_seq_map = std::move(other._dup_seq_map);
   _unassigned_sites = std::move(other._unassigned_sites);
   _subst_linkage = std::move(other._subst_linkage);
   _freqs_linkage = std::move(other._freqs_linkage);
@@ -25,6 +26,11 @@ PartitionedMSA& PartitionedMSA::operator=(PartitionedMSA&& other)
 void PartitionedMSA::init_single_model(DataType data_type, const std::string &model_string)
 {
   _auto_part->init_from_string(*this, data_type, model_string);
+}
+
+bool PartitionedMSA::has_taxon(const std::string& taxon_name, bool with_dups /* = false */) const
+{
+  return _taxon_id_map.count(taxon_name) || (with_dups && _dup_seq_map.count(taxon_name));
 }
 
 ModelCRefMap PartitionedMSA::models() const
@@ -38,9 +44,20 @@ ModelCRefMap PartitionedMSA::models() const
 
 void PartitionedMSA::set_taxon_names(const NameList& taxon_names)
 {
+  /* update mapping from taxon names to taxon IDs */
+  _taxon_id_map.clear();
+  for (size_t i = 0; i < taxon_names.size(); ++i)
+    _taxon_id_map[taxon_names[i]] = i;
+
+  /* update representative taxon ids in the duplicate sequence map */
+  for (auto& d: _dup_seq_map)
+  {
+    auto old_id = d.second;
+    auto new_id = _taxon_id_map[_taxon_names[old_id]];
+    d.second = new_id;
+  }
+
   _taxon_names.assign(taxon_names.cbegin(), taxon_names.cend());
-  for (size_t i = 0; i < _taxon_names.size(); ++i)
-    _taxon_id_map[_taxon_names[i]] = i;
 
   assert(_taxon_names.size() == taxon_names.size() && _taxon_id_map.size() == taxon_names.size());
 }
@@ -285,6 +302,22 @@ void PartitionedMSA::set_model_empirical_params()
   {
     pinfo.set_model_empirical_params();
   }
+}
+
+void PartitionedMSA::remove_taxa(const IDSet& taxon_ids)
+{
+  for (PartitionInfo& pinfo: _part_list)
+  {
+    pinfo.msa().remove_taxa(taxon_ids);
+  }
+
+  if (!_full_msa.empty())
+  {
+    _full_msa.remove_taxa(taxon_ids);
+    set_taxon_names(_full_msa.labels());
+  }
+  else
+    set_taxon_names(part_msa(0).labels());
 }
 
 std::ostream& operator<<(std::ostream& stream, const PartitionedMSA& part_msa)

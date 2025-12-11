@@ -24,6 +24,7 @@ public:
   const std::vector<PartitionInfo>& part_list() const { return _part_list; };
   std::vector<PartitionInfo>& part_list() { return _part_list; };
   const NameList& taxon_names()  const { return _taxon_names; };
+  bool has_taxon(const std::string& taxon_name, bool with_dups = false) const;
   const NameIdMap& taxon_id_map() const { return _taxon_id_map; }
   const IDVector& unassigned_sites()  const { return _unassigned_sites; };
 
@@ -62,6 +63,11 @@ public:
   void subst_linkage(const uintVector& v) { _subst_linkage = v; }
   void freqs_linkage(const uintVector& v) { _freqs_linkage = v; }
 
+  // mapping original tip_id -> taxon name of (removed) duplicate sequence
+  const NameIdMap& dup_seq_map() const { return _dup_seq_map; }
+  void mark_dup_seq(const std::string& dup_taxon_name, size_t orig_taxon_id)
+  { _dup_seq_map[dup_taxon_name] = orig_taxon_id; }
+
   // operations
   void init_single_model(DataType data_type, const std::string &model_string);
   void append_part_info(PartitionInfo&& part_info) { _part_list.push_back(std::move(part_info)); };
@@ -75,7 +81,8 @@ public:
   void split_msa();
   void compress_patterns(bool store_backmap = false);
   void set_model_empirical_params();
-  //void predict_difficulty(int n_trees){ _difficuly = (part_count() == 1) ? _part_list.at(0).msa().predictDifficulty(n_trees) : _full_msa.predictDifficulty(n_trees); };
+
+  void remove_taxa(const IDSet& taxon_ids);
 
 private:
   std::vector<PartitionInfo> _part_list;
@@ -83,6 +90,7 @@ private:
   MSA _full_msa;
   NameList _taxon_names;
   NameIdMap _taxon_id_map;
+  NameIdMap _dup_seq_map;
   mutable uintVector _site_part_map;
   mutable IDVector _unassigned_sites;
   double _difficulty_score;
