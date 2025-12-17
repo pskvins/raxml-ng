@@ -327,27 +327,42 @@ NameIdMap Tree::tip_ids() const
   return result;
 }
 
+void Tree::tip_label(unsigned int tip_id, const string& label)
+{
+  for (auto const& node: tip_nodes())
+  {
+    if (node->clv_index == tip_id)
+    {
+      free(node->label);
+      node->label = strdup(label.c_str());
+      break;
+    }
+  }
+}
+
 void Tree::remove_tips(const NameList& tips)
 {
   if (tips.empty())
     return;
 
   const auto old_tips = tip_ids();
-  std::vector<unsigned int> tip_ids;
+  std::vector<unsigned int> del_tip_ids;
   for (const auto& t: tips)
   {
     if (old_tips.count(t))
-      tip_ids.push_back(old_tips.at(t));
-//    printf("%u  %s\n", tip_ids.back(), t.c_str());
+    {
+      del_tip_ids.push_back(old_tips.at(t));
+//      printf("%u  %s\n", del_tip_ids.back(), t.c_str());
+    }
   }
 
-  /* all tips already in the tree -> nothing to do */
-  if (tip_ids.empty())
+  /* no tips found in the tree -> nothing to do */
+  if (del_tip_ids.empty())
     return;
 
   int retval = corax_utree_remove_tips(_pll_utree.get(),
-                                       tip_ids.size(),
-                                       tip_ids.data(),
+                                       del_tip_ids.size(),
+                                       del_tip_ids.data(),
                                        nullptr);
 
   if (retval)

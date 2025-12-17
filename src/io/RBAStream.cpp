@@ -4,7 +4,7 @@
 using namespace std;
 
 const uint64_t RBA_MAGIC       = *(reinterpret_cast<const uint64_t*>("RBAF\x13\x12\x17\x0A"));
-const uint32_t RBA_VERSION     = 4;
+const uint32_t RBA_VERSION     = 5;
 const uint32_t RBA_MIN_VERSION = 3;
 
 struct RBAHeader
@@ -52,6 +52,8 @@ RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa)
   header.pattern_count = part_msa.total_patterns();
   header.part_count = part_msa.part_count();
 
+  bos.version(header.version);
+
   bos << header;
 
   // msa difficulty (pythia)
@@ -62,6 +64,9 @@ RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa)
   {
     bos << label;
   }
+
+  // duplicate sequence map
+  bos << part_msa.dup_seq_map();
 
   // models
   for (const auto& pinfo: part_msa.part_list())
@@ -109,6 +114,8 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
   if (!header.supported())
     throw runtime_error("Unsupported RBA file version: " + to_string(header.version));
 
+  bos.version(header.version);
+
   auto& part_msa = std::get<0>(out);
   auto& elem = std::get<1>(out);
   auto& pa = std::get<2>(out);
@@ -148,8 +155,20 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
 //    LOG_INFO << bos.get<std::string>() << endl;
   }
 
+  NameIdMap dup_seq_map;
+  if (header.version >= 5)
+    bos >> dup_seq_map;
+
+  for (const auto& d: dup_seq_map)
+    printf("%s %u\n", d.first.c_str(), d.second);
+
+
   if (load_meta)
+  {
     part_msa = PartitionedMSA(taxon_names);
+    for (const auto& d: dup_seq_map)
+      part_msa.mark_dup_seq(d.first, d.second);
+  }
 
   for (size_t i = 0; i < header.part_count; ++i)
   {

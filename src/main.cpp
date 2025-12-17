@@ -210,12 +210,6 @@ void init_part_info(RaxmlInstance& instance)
   {
     opts.msa_format = FileFormat::binary;
 
-    if (opts.command == Command::sitelh)
-    {
-      throw runtime_error("Alignments in RBA format are not supported in "
-          "per-site likelihood mode, sorry!\n       Please use PHYLIP/FASTA instead.");
-    }
-
     if (!opts.model_file.empty() && !opts.auto_model())
     {
       LOG_WARN <<
@@ -604,7 +598,8 @@ bool check_msa(RaxmlInstance& instance)
                  << " the final tree." << endl;
         break;
       case AbnormalSequenceAction::error:
-        LOG_ERROR << "ERROR: Fully undetermined sequences found! " << endl;
+        LOG_ERROR << "ERROR: Fully undetermined sequences found!" << endl;
+        LOG_ERROR << "HINT:  Add '--extra seq-allgap-remove' to automatically remove (ignore) them." << endl;
         msa_valid = false;
         break;
     }
@@ -1278,7 +1273,9 @@ void load_msa(RaxmlInstance& instance)
   if (opts.use_pattern_compression)
   { 
     LOG_VERB_TS << "Compressing alignment patterns... " << endl;
-    bool store_backmap = opts.command == Command::sitelh;
+
+    // the overhead is rather small, but could be disabled via a cmdline flag if needed
+    bool store_backmap = true;
     
     parted_msa.compress_patterns(store_backmap);
 
@@ -1407,8 +1404,25 @@ void prune_duplicate_seqs(const RaxmlInstance& instance, Tree& tree)
   if (instance.parted_msa && !instance.parted_msa->dup_seq_map().empty())
   {
     NameList dup_tips;
+    auto old_tips = tree.tip_ids();
+    const auto msa_tax_names = instance.parted_msa->taxon_names();
     for (const auto& t: instance.parted_msa->dup_seq_map())
-      dup_tips.emplace_back(t.first);
+    {
+      assert(t.second < msa_tax_names.size());
+      const auto& dup_taxon_name = t.first;
+      const auto& orig_taxon_name = msa_tax_names[t.second];
+
+      if (old_tips.count(dup_taxon_name))
+      {
+        if (old_tips.count(orig_taxon_name)) {
+          // original taxon in the tree -> remove duplicate
+          dup_tips.emplace_back(t.first);
+        } else {
+          // original taxon not found -> rename duplicate to original
+          tree.tip_label(old_tips.at(dup_taxon_name), orig_taxon_name);
+        }
+      }
+    }
     tree.remove_tips(dup_tips);
   }
 }

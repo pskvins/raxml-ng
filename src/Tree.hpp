@@ -99,10 +99,11 @@ public:
                              const Tree& constrained_tree, const IDVector& tip_msa_idmap);
   static Tree loadFromFile(const std::string& file_name);
 
-  std::vector<const char*> tip_labels_cstr() const;
+  NameIdMap tip_ids() const;
   NameList tip_labels_list() const;
   IdNameVector tip_labels() const;
-  NameIdMap tip_ids() const;
+  std::vector<const char*> tip_labels_cstr() const;
+  void tip_label(unsigned int tip_id, const string& label);
 
   TreeTopology topology() const;
   void topology(const TreeTopology& topol);

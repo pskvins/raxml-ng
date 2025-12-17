@@ -63,7 +63,7 @@ public:
   void subst_linkage(const uintVector& v) { _subst_linkage = v; }
   void freqs_linkage(const uintVector& v) { _freqs_linkage = v; }
 
-  // mapping original tip_id -> taxon name of (removed) duplicate sequence
+  // mapping taxon name of (removed) duplicate sequence -> original tip_id
   const NameIdMap& dup_seq_map() const { return _dup_seq_map; }
   void mark_dup_seq(const std::string& dup_taxon_name, size_t orig_taxon_id)
   { _dup_seq_map[dup_taxon_name] = orig_taxon_id; }

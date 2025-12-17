@@ -368,6 +368,9 @@ BasicBinaryStream& operator<<(BasicBinaryStream& stream, const MSA& m)
 
   stream << m.weights();
 
+  if (stream.version() >= 5)
+    stream << m.site_pattern_map();
+
   for (size_t i = 0; i < m.size(); ++i)
   {
     auto seq = m.at(i);
@@ -386,6 +389,9 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSA& m)
   m = MSA(pat_count);
 
   m.weights(stream.get<WeightVector>());
+
+  if (stream.version() >= 5)
+    m.site_pattern_map(stream.get<WeightVector>());
 
   std::string seq(pat_count, 0);
   for (size_t i = 0; i < taxa_count; ++i)
@@ -432,6 +438,20 @@ BasicBinaryStream& operator>>(BasicBinaryStream& stream, MSARange mr)
   read_vector_range(stream, &w[0], rl, pat_count);
 
   m.weights(std::move(w));
+
+  if (stream.version() >= 5)
+  {
+    /* number of _uncompressed_ sites in a local MSARange = sum of elements
+     * in the weights vector loaded above  */
+    auto local_sites = m.num_sites();
+
+    /* total number of _uncompressed_ sites in the MSA - we read it from stream */
+    auto global_sites = stream.get<size_t>();
+
+    WeightVector s(local_sites);
+    read_vector_range(stream, &s[0], rl, global_sites);
+    m.site_pattern_map(stream.get<WeightVector>());
+  }
 
   std::string seq(local_len, 0);
   for (size_t i = 0; i < taxa_count; ++i)

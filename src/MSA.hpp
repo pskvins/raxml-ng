@@ -83,6 +83,8 @@ public:
   void num_sites(const unsigned int sites) { _num_sites = sites; }
   void weights(const WeightVector& v);
   void weights(WeightVector&& v);
+  void site_pattern_map(const WeightVector& v);
+  void site_pattern_map(WeightVector&& v);
 
   void remove_sites(const std::vector<size_t>& site_indices);
   void remove_taxa(const IDSet& taxon_ids);

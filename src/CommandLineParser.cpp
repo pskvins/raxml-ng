@@ -1016,6 +1016,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         break;
       case 34: /* parse */
         opts.command = Command::parse;
+        opts.dup_seqs_action = AbnormalSequenceAction::regraft;
+        opts.allgap_seqs_action = AbnormalSequenceAction::remove;
         num_commands++;
         break;
       case 35: /* branch length optimization method */

@@ -376,6 +376,15 @@ void MSA::weights(WeightVector&& v)
   update_num_sites();
 }
 
+void MSA::site_pattern_map(const WeightVector& v)
+{
+  _weights = v;
+}
+
+void MSA::site_pattern_map(WeightVector&& v)
+{
+  _weights = std::move(v);
+}
 
 const RangeList& MSA::local_seq_ranges() const
 {
