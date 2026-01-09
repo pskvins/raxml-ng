@@ -159,10 +159,6 @@ RBAStream& operator>>(RBAStream& stream, RBAStream::RBAOutput out)
   if (header.version >= 5)
     bos >> dup_seq_map;
 
-  for (const auto& d: dup_seq_map)
-    printf("%s %u\n", d.first.c_str(), d.second);
-
-
   if (load_meta)
   {
     part_msa = PartitionedMSA(taxon_names);
