@@ -44,13 +44,14 @@ enum class Command
   ancestral,
   sitelh,
   pythia,
-  modeltest
+  modeltest,
+  mutmap
 };
 
 const std::string CommandNames[] = {"none", "help", "version", "evaluate", "search", "bootstrap",
                                     "all", "support", "bsconverge", "bsmsa", "terrace", "check",
                                     "parse", "start", "rfdist", "consense", "ancestral", "sitelh",
-                                    "pythia", "modeltest" };
+                                    "pythia", "modeltest", "mutmap" };
 
 enum class FileFormat
 {

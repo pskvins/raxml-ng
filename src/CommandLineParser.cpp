@@ -107,6 +107,7 @@ static struct option long_options[] =
   {"modeltest",          optional_argument, 0, 0 },  /*  74 */
   {"moose",              optional_argument, 0, 0 },  /*  75 */
   {"moose-options",      required_argument, 0, 0 },  /*  76 */
+  {"mutmap",             optional_argument, 0, 0 },  /*  77 */
 
   { 0, 0, 0, 0 }
 };
@@ -264,7 +265,7 @@ void CommandLineParser::compute_num_searches(Options &opts)
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::start ||
       opts.command == Command::ancestral || opts.command == Command::sitelh ||
-      opts.command == Command::modeltest)
+      opts.command == Command::modeltest || opts.command == Command::mutmap)
   {
     assert(!opts.start_trees.empty());
 
@@ -1551,6 +1552,13 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 76: /* model selection options */
         optarg_modeltest = optarg;
         break;
+      case 77: /* mutation mapping */
+        opts.command = Command::mutmap;
+        opts.use_pattern_compression = false;
+        opts.use_repeats = false;
+        opts.use_tip_inner = true;
+        num_commands++;
+        break;
       default:
         throw  OptionException("Internal error in option parsing");
     }
@@ -1644,6 +1652,7 @@ void CommandLineParser::print_help()
             "  --consense [ STRICT | MR | MR<n> | MRE ]   build strict, majority-rule (MR) or extended MR (MRE) consensus tree (default: MR)\n"
             "                                             eg: --consense MR75 --tree bsrep.nw\n"
             "  --ancestral                                ancestral state reconstruction at all inner nodes\n"
+            "  --mutmap                                   map mutations to the tree branches\n"
             "  --sitelh                                   print per-site log-likelihood values\n"
             "  --pythia                                   compute and print Pythia MSA difficulty score\n"
             "  --moose [ OPTIONS ]                        select best-fit MOdel Of Sequence Evolution (OPTIONS: see below)\n"

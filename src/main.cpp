@@ -923,7 +923,7 @@ void check_options_early(Options& opts)
   if (opts.coarse() && opts.num_ranks > 1)
     opts.write_interim_results = false;
 
-  if (opts.command == Command::ancestral)
+  if (opts.command == Command::ancestral || opts.command == Command::mutmap)
   {
     if (opts.use_pattern_compression)
       throw runtime_error("Pattern compression is not supported in ancestral state reconstruction mode!");
@@ -2202,8 +2202,10 @@ void generate_bootstraps(RaxmlInstance& instance, const CheckpointFile& checkp)
 
 void init_ancestral(RaxmlInstance& instance)
 {
-  if (instance.opts.command == Command::ancestral)
+  if (instance.opts.command == Command::ancestral || instance.opts.command == Command::mutmap)
   {
+    assert(!instance.start_trees.empty());
+
     const auto& parted_msa = *instance.parted_msa;
     const Tree& tree = instance.start_trees.at(0);
 
@@ -2909,7 +2911,7 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
 
   if (opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::sitelh ||
-      opts.command == Command::ancestral)
+      opts.command == Command::ancestral || instance.opts.command == Command::mutmap)
   {
     auto model_log_lvl = parted_msa.part_count() > 1 ? LogLevel::verbose : LogLevel::info;
     const auto& ml_models = instance.ml_tree.models;
@@ -3219,6 +3221,26 @@ void print_final_output(const RaxmlInstance& instance, const CheckpointFile& che
     }
   }
 
+  if (opts.command == Command::mutmap)
+  {
+    MutationMap mmap(*instance.ancestral_states, *instance.parted_msa);
+    if (!opts.mut_maptree_file().empty())
+    {
+      NewickStream mts(opts.mut_maptree_file());
+      mts << mmap;
+
+      LOG_INFO << "Branch-labeled tree saved to: " << sysutil_realpath(opts.mut_maptree_file()) << endl;
+    }
+
+    if (!opts.mut_maplist_file().empty())
+    {
+      MutationMapListStream mls(opts.mut_maplist_file());
+      mls << mmap;
+
+      LOG_INFO << "Per-branch mutation list saved to: " << sysutil_realpath(opts.mut_maplist_file()) << endl;
+    }
+  }
+
   if (opts.command == Command::sitelh)
   {
     if (!opts.sitelh_file().empty())
@@ -3468,7 +3490,7 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
       optimizer.disable_stopping_rule();
 
     if (opts.command == Command::evaluate || opts.command == Command::sitelh ||
-        opts.command == Command::ancestral)
+        opts.command == Command::ancestral || opts.command == Command::mutmap)
     { 
       // check if we have anything to optimize
       if (opts.optimize_brlen || opts.optimize_model)
@@ -3522,7 +3544,7 @@ void thread_infer_ml(RaxmlInstance& instance, CheckpointManager& cm)
 
   gather_ml_trees(batch_id);
 
-  if (opts.command == Command::ancestral)
+  if (opts.command == Command::ancestral || opts.command == Command::mutmap)
   {
     assert(!opts.use_pattern_compression);
     treeinfo->compute_ancestral(instance.ancestral_states, part_assign);
@@ -3821,7 +3843,7 @@ void thread_main(RaxmlInstance& instance, CheckpointManager& cm)
 
   if ((opts.command == Command::search || opts.command == Command::all ||
       opts.command == Command::evaluate || opts.command == Command::sitelh ||
-      opts.command == Command::ancestral) &&
+      opts.command == Command::ancestral || opts.command == Command::mutmap) &&
       !instance.start_trees.empty())
   {
     thread_infer_ml(instance, cm);
@@ -4105,6 +4127,7 @@ int internal_main(int argc, char** argv, void* comm)
       case Command::consense:
       case Command::sitelh:
       case Command::ancestral:
+      case Command::mutmap:
       case Command::modeltest:
         if (!opts.redo_mode && opts.result_files_exist())
         {
@@ -4199,6 +4222,7 @@ int internal_main(int argc, char** argv, void* comm)
         case Command::bootstrap:
         case Command::all:
         case Command::ancestral:
+        case Command::mutmap:
         case Command::modeltest:
         {
           master_main(instance, cm);

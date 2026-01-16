@@ -127,6 +127,8 @@ void Options::set_default_outfiles()
   set_default_outfile(outfile_names.asr_tree, "ancestralTree");
   set_default_outfile(outfile_names.asr_probs, "ancestralProbs");
   set_default_outfile(outfile_names.asr_states, "ancestralStates");
+  set_default_outfile(outfile_names.mut_map_tree, "mutationMapTree");
+  set_default_outfile(outfile_names.mut_map_list, "mutationMapList");
   set_default_outfile(outfile_names.site_loglh, "siteLH");
   set_default_outfile(outfile_names.modeltest_best_model, "moose.bestModel");
   set_default_outfile(outfile_names.modeltest_xml, "moose.xml");
@@ -220,6 +222,8 @@ bool Options::result_files_exist() const
     case Command::ancestral:
       return sysutil_file_exists(asr_tree_file()) || sysutil_file_exists(asr_probs_file()) ||
              sysutil_file_exists(asr_states_file());
+    case Command::mutmap:
+      return sysutil_file_exists(mut_maplist_file()) || sysutil_file_exists(mut_maptree_file());
     case Command::sitelh:
       return sysutil_file_exists(sitelh_file());
     case Command::modeltest:
@@ -277,6 +281,12 @@ void Options::remove_result_files() const
     sysutil_file_remove(asr_tree_file());
     sysutil_file_remove(asr_probs_file());
     sysutil_file_remove(asr_states_file());
+  }
+
+  if (command == Command::mutmap)
+  {
+    sysutil_file_remove(mut_maplist_file());
+    sysutil_file_remove(mut_maptree_file());
   }
 
   if (command == Command::modeltest)
@@ -442,6 +452,9 @@ std::ostream& operator<<(std::ostream& stream, const Options& opts)
       break;
     case Command::ancestral:
       stream << "Ancestral state reconstruction";
+      break;
+    case Command::mutmap:
+      stream << "Mutation mapping";
       break;
     case Command::sitelh:
       stream << "Per-site likelihood computation";

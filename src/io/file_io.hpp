@@ -4,6 +4,7 @@
 #include <fstream>
 #include "../Tree.hpp"
 #include "../AncestralStates.hpp"
+#include "../MutationMap.hpp"
 #include "../bootstrap/BootstrapTree.hpp"
 #include "../bootstrap/BootstrapGenerator.hpp"
 #include "../PartitionedMSAView.hpp"
@@ -11,15 +12,20 @@
 class NewickStream : public std::fstream
 {
 public:
-  NewickStream(const std::string& fname) : std::fstream(fname, std::ios::out), _brlens(true) {};
+  NewickStream(const std::string& fname) : std::fstream(fname, std::ios::out),
+    _brlens(true), _brlabs(false) {};
   NewickStream(const std::string& fname, std::ios_base::openmode mode) :
-    std::fstream(fname, mode), _brlens(true) {};
+    std::fstream(fname, mode), _brlens(true), _brlabs(false) {};
 
   bool brlens() const { return _brlens; }
   void brlens(bool v) { _brlens = v; }
 
+  bool brlabs() const { return _brlabs; }
+  void brlabs(bool v) { _brlabs = v; }
+
 private:
   bool _brlens;
+  bool _brlabs;
 };
 
 class MSAFileStream
@@ -171,13 +177,21 @@ public:
     FileIOStream(fname, mode) {};
 };
 
+class MutationMapListStream : public FileIOStream
+{
+public:
+  MutationMapListStream(const std::string& fname) : FileIOStream(fname) {};
+  MutationMapListStream(const std::string& fname, std::ios_base::openmode mode) :
+    FileIOStream(fname, mode) {};
+};
+
 NewickStream& operator<<(NewickStream& stream, const corax_unode_t& root);
 NewickStream& operator<<(NewickStream& stream, const corax_utree_t& tree);
 NewickStream& operator<<(NewickStream& stream, const Tree& tree);
 NewickStream& operator>>(NewickStream& stream, Tree& tree);
 
 NewickStream& operator<<(NewickStream& stream, const AncestralStates& ancestral);
-//NewickStream& operator>>(NewickStream& stream, BootstrapTree& tree);
+NewickStream& operator<<(NewickStream& stream, const MutationMap& mutmap);
 
 NewickStream& operator<<(NewickStream& stream, const SupportTree& tree);
 
@@ -209,6 +223,8 @@ RaxmlPartitionStream& operator<<(RaxmlPartitionStream& stream, const Partitioned
 
 AncestralProbStream& operator<<(AncestralProbStream& stream, const AncestralStates& ancestral);
 AncestralStateStream& operator<<(AncestralStateStream& stream, const AncestralStates& ancestral);
+
+MutationMapListStream& operator<<(MutationMapListStream& stream, const MutationMap& mutmap);
 
 std::string to_newick_string_rooted(const Tree& tree, double root_brlen = 0.0);
 void to_newick_file(const corax_utree_t& tree, const std::string& fname);
