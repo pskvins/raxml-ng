@@ -31,13 +31,16 @@ private:
 class MSAFileStream
 {
 public:
-  MSAFileStream(const std::string& fname) :
-    _fname(fname) {}
+  MSAFileStream(const std::string& fname, DataType data_type = DataType::autodetect) :
+    _fname(fname), _data_type(data_type) {}
 
   const std::string& fname() const { return _fname; };
+  DataType data_type() const { return _data_type; };
+  unsigned int num_states() const { return DatatypeStates.at(_data_type); };
 
 private:
   std::string _fname;
+  DataType _data_type;
 };
 
 class PhylipStream : public MSAFileStream
@@ -65,7 +68,8 @@ private:
 class CATGStream : public MSAFileStream
 {
 public:
-  CATGStream(const std::string& fname) : MSAFileStream(fname) {}
+  CATGStream(const std::string& fname, DataType data_type) :
+    MSAFileStream(fname, data_type) {}
 };
 
 #ifdef _RAXML_VCF
@@ -83,15 +87,22 @@ enum class VCFLikelihoodMode
 class VCFStream : public MSAFileStream
 {
 public:
-  VCFStream(const std::string& fname, bool normalized_gl = false,
+  VCFStream(const std::string& fname, DataType data_type, bool normalized_gl = false,
             VCFLikelihoodMode likelihood_mode = VCFLikelihoodMode::autodetect) :
-    MSAFileStream(fname), _use_normalized_gl(normalized_gl), _gt_likelihood_mode(likelihood_mode) {}
+    MSAFileStream(fname, data_type), _use_normalized_gl(normalized_gl),
+    _skip_invalid_snvs(false), _gt_likelihood_mode(likelihood_mode) {}
 
   bool use_normalized_gl() const { return _use_normalized_gl; }
   VCFLikelihoodMode gt_likelihood_mode() const { return _gt_likelihood_mode; }
 
+  bool skip_invalid_snvs() const { return _skip_invalid_snvs; }
+  void skip_invalid_snvs(bool skip) { _skip_invalid_snvs = skip; }
+
+  static bool vcf_file(const std::string& fname);
+
 private:
   bool _use_normalized_gl;
+  bool _skip_invalid_snvs;
   VCFLikelihoodMode _gt_likelihood_mode;
 };
 #endif
@@ -203,7 +214,8 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa);
 VCFStream& operator>>(VCFStream& stream, MSA& msa);
 #endif
 
-MSA msa_load_from_file(const std::string &filename, FileFormat format, const Options& opts);
+MSA msa_load_from_file(const std::string &filename, FileFormat format, const Options& opts,
+                       DataType data_type = DataType::autodetect);
 
 PhylipStream& operator<<(PhylipStream& stream, const MSA& msa);
 PhylipStream& operator<<(PhylipStream& stream, const PartitionedMSA& msa);

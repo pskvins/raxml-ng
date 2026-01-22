@@ -915,7 +915,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         {
           opts.msa_format = FileFormat::catg;
         }
-        else if (strcasecmp(optarg, "binary") == 0)
+        else if (strcasecmp(optarg, "binary") == 0 || strcasecmp(optarg, "rba") == 0)
         {
           opts.msa_format = FileFormat::binary;
         }

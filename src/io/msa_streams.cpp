@@ -306,12 +306,19 @@ FileFormat msa_detect_file_format(const std::string &filename)
     }
   }
 
+#ifdef _RAXML_VCF
+  /* more thorough check with htslib -> this will also detect compressed vcf.gz files */
+  if (VCFStream::vcf_file(filename))
+    return FileFormat::vcf;
+#endif
+
   // failed to detect format so far, will try later
   return FileFormat::autodetect;
 }
 
 
-MSA msa_load_from_file(const std::string &filename, FileFormat format, const Options& opts)
+MSA msa_load_from_file(const std::string &filename, FileFormat format, const Options& opts,
+                       DataType data_type)
 {
   MSA msa;
   string parser_error;
@@ -383,7 +390,7 @@ MSA msa_load_from_file(const std::string &filename, FileFormat format, const Opt
         }
         case FileFormat::catg:
         {
-          CATGStream s(filename);
+          CATGStream s(filename, data_type);
           s >> msa;
           return msa;
           break;
@@ -394,7 +401,8 @@ MSA msa_load_from_file(const std::string &filename, FileFormat format, const Opt
           auto vcf_lh_mode = opts.use_prob_msa ?
                              VCFLikelihoodMode::autodetect : VCFLikelihoodMode::none;
           bool normalized_gl = false;  // opts.vcf_normalized_gl
-          VCFStream s(filename, normalized_gl, vcf_lh_mode);
+          VCFStream s(filename, data_type, normalized_gl, vcf_lh_mode);
+          s.skip_invalid_snvs(true);
           s >> msa;
           return msa;
 #else

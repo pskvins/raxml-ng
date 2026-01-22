@@ -15,6 +15,12 @@
 
 using namespace std;
 
+class vcf_parse_errpr: public runtime_error
+{
+public:
+  vcf_parse_errpr (const string& msg) : runtime_error(msg) {}
+};
+
 struct SNVRecord
 {
   string err_coord;
@@ -27,7 +33,9 @@ struct SNVRecord
   unsigned int pl_per_sample;
   int pl_d10_map[10];
 
-  bcf_fmt_t * sample_gt;
+  int gt_count;
+  int max_ploidy;
+  int32_t * sample_gt;
   float * sample_lh;
   int sample_lh_size;
   int * sample_plh;
@@ -37,7 +45,7 @@ struct SNVRecord
 
   void error(const string& msg)
   {
-    throw runtime_error(err_coord + msg);
+    throw vcf_parse_errpr(err_coord + msg);
   }
 };
 
@@ -48,12 +56,43 @@ struct SNVRecord
 static const int vcf_to_rax_map[10] = {0, 4, 5, 6, 1, 7, 8, 2, 9, 3 };
 
 char gt10_to_char[4][4];
+char gt16_to_char[4][4];
+
+                            /* A   C   G   T  */
+int gt16_to_stateid[4][4] =  { {0,  4,  5,  6},    /* A  */
+                               {10, 1,  7,  8},    /* C  */
+                               {11, 13, 2,  9},    /* G  */
+                               {12, 14, 15, 3},    /* T  */
+                             };
+
 
 #ifdef _RAXML_VCF_DEBUG
-static const char gt_inv_map[][3] = {"AA", "CC", "GG", "TT", "AC", "AG", "AT", "CG", "CT", "GT"};
+static const char gt4_inv_map[][3] = {"A", "C", "G", "T"};
+static const char gt10_inv_map[][3] = {"AA", "CC", "GG", "TT", "AC", "AG", "AT", "CG", "CT", "GT"};
+static const char gt16_inv_map[][3] = {"AA", "CC", "GG", "TT", "AC", "AG", "AT", "CG", "CT", "GT",
+                                                               "CA", "GA", "TA", "GC", "TC", "TG"};
 #endif
 
 static const char vcf_lh_field[][6] = {"NONE", "GL", "PL", "FPL", "G10", "G10N"};
+
+static const char gap_char = '-';
+
+bool VCFStream::vcf_file(const std::string& fname)
+{
+  htsFile * fp    = hts_open(fname.c_str(), "rb");
+
+  if (!fp)
+    return false;
+
+  const htsFormat * fmt = hts_get_format(fp);
+
+  bool res = (fmt->category == variant_data);
+
+  hts_close(fp);
+
+  return res;
+}
+
 
 static VCFLikelihoodMode detect_likelihood_mode(VCFStream& stream, bcf_hdr_t *hdr)
 {
@@ -122,16 +161,29 @@ static void set_sample_names(MSA& msa, bcf_hdr_t * hdr)
 
 static void init_maps()
 {
-  char inv_charmap[CORAX_ASCII_SIZE] = {0};
+  char inv_charmap10[CORAX_ASCII_SIZE] = {0};
+  char inv_charmap16[CORAX_ASCII_SIZE] = {0};
   for (unsigned int i = 0; i < CORAX_ASCII_SIZE; ++i)
-    if (corax_map_nt[i] && !inv_charmap[corax_map_nt[i]])
-      inv_charmap[corax_map_nt[i]] = (char)i;
+  {
+    if (corax_map_nt[i] && !inv_charmap10[corax_map_nt[i]])
+      inv_charmap10[corax_map_nt[i]] = (char)i;
+
+    if (corax_map_gt16[i] && CORAX_STATE_POPCNT(corax_map_gt16[i]) == 1)
+    {
+      int state_id = CORAX_STATE_CTZ(corax_map_gt16[i]);
+      if (!inv_charmap16[state_id])
+        inv_charmap16[state_id] = (char)i;
+    }
+  }
 
   for (size_t i = 0; i < 4; ++i)
   {
     for (size_t j = 0; j < 4; ++j)
     {
-      gt10_to_char[i][j] = inv_charmap[ (1u << i) | (1u << j)];
+      gt10_to_char[i][j] = inv_charmap10[ (1u << i) | (1u << j)];
+
+      size_t state_id = gt16_to_stateid[i][j];
+      gt16_to_char[i][j] = inv_charmap16[state_id];
     }
   }
 }
@@ -140,6 +192,7 @@ static void init_snv_rec(SNVRecord& snv)
 {
   snv.sample_lh_size = 0;
   snv.sample_plh_size = 0;
+  snv.sample_gt = NULL;
   snv.sample_plh = NULL;
   snv.sample_lh = NULL;
   snv.lh_underflow = 0;
@@ -147,6 +200,7 @@ static void init_snv_rec(SNVRecord& snv)
 
 static void free_snv_rec(SNVRecord& snv)
 {
+  free(snv.sample_gt);
   free(snv.sample_lh);
   free(snv.sample_plh);
 }
@@ -171,7 +225,7 @@ static void init_pl_d10_map(SNVRecord& snv)
       int d10 = CORAX_STATE_CTZ(corax_map_gt10[(int) gt10_to_char[c1][c2]]);
       snv.pl_d10_map[g++] = d10;
 #ifdef _RAXML_VCF_DEBUG
-      printf("%s ", gt_inv_map[d10]);
+      printf("%s ", gt10_inv_map[d10]);
 #endif
     }
   }
@@ -182,7 +236,7 @@ static void init_pl_d10_map(SNVRecord& snv)
 static void read_snv_fixed(SNVRecord& snv, bcf_hdr_t * hdr, bcf1_t * rec)
 {
   unsigned int i, k;
-  const char * supported_alleles = "ACGT";
+  const char * supported_alleles = "ACGTN";
 
   auto chr = bcf_hdr_id2name(hdr, rec->rid);
   auto pos = rec->pos+1;
@@ -191,7 +245,7 @@ static void read_snv_fixed(SNVRecord& snv, bcf_hdr_t * hdr, bcf1_t * rec)
   snv.al_count = rec->n_allele;
   snv.pl_per_sample = snv.al_count * (snv.al_count + 1) / 2;
   if (snv.al_count > 4)
-   snv.error(snv.err_coord + "Wrong number of alleles (" + to_string(snv.al_count) + ")");
+   snv.error("Wrong number of alleles (" + to_string(snv.al_count) + ")");
 
   snv.snv_name = strlen(rec->d.id) > 1 ? rec->d.id : string(chr) + ":" + to_string(pos);
 #ifdef _RAXML_VCF_DEBUG
@@ -220,7 +274,7 @@ static void read_snv_fixed(SNVRecord& snv, bcf_hdr_t * hdr, bcf1_t * rec)
   {
     for (k = i+1; k < snv.al_count; ++k)
     {
-      if ((snv.al_states[i] & snv.al_states[k]) != 0)
+      if (((snv.al_states[i] & snv.al_states[k]) != 0) && snv.al_names[i] != 'N' && snv.al_names[k] != 'N')
       {
         snv.error("Wrong REF/ALT alleles: " +
                   to_string(char(snv.al_names[i])) + " / " + char(snv.al_names[k]));
@@ -228,12 +282,12 @@ static void read_snv_fixed(SNVRecord& snv, bcf_hdr_t * hdr, bcf1_t * rec)
     }
   }
 
-  init_pl_d10_map(snv);
-
 #ifdef _RAXML_VCF_DEBUG
-  printf("chrom: %s, pos: %u, ref/het/alt: ", chr, pos);
+  printf("chrom: %s, pos: %ld, REF: %c, ALT: %c,%c,%c  GT: ",
+         chr, pos, snv.al_names[0], snv.al_names[1], snv.al_names[2], snv.al_names[3]);
 #endif
 
+  init_pl_d10_map(snv);
 
 #ifdef _RAXML_VCF_DEBUG
   printf("\n");
@@ -243,10 +297,17 @@ static void read_snv_fixed(SNVRecord& snv, bcf_hdr_t * hdr, bcf1_t * rec)
 static void read_snv_sample_data(SNVRecord& snv, bcf_hdr_t * hdr, bcf1_t * rec,
                                  VCFLikelihoodMode lh_mode)
 {
-  snv.sample_gt = bcf_get_fmt(hdr, rec, "GT");
+   int sample_count = bcf_hdr_nsamples(hdr);
+   int32_t ngt_arr = 0;
 
-  if (!snv.sample_gt)
-    snv.error("Field GT not found");
+   snv.gt_count = bcf_get_genotypes(hdr, rec, &snv.sample_gt, &ngt_arr);
+   if (!snv.gt_count)
+     snv.error("Field GT not found");
+   snv.max_ploidy = snv.gt_count / sample_count;
+
+#ifdef _RAXML_VCF_DEBUG
+   printf("gt_count: %d, max_ploidy: %d\n", snv.gt_count, snv.max_ploidy);
+#endif
 
   if (lh_mode == VCFLikelihoodMode::none)
     return;
@@ -327,6 +388,12 @@ void set_g10_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id)
   auto site_probs = msa.probs(sample_id, snv_id);
   auto gt_g10 = snv.sample_lh + sample_id * 10;
 
+  if (msa.states() < 10)
+  {
+    snv.error("Wrong number of model states: " + to_string(msa.states()) + "\n " +
+              "Try using a different model (GT10 or GT16) or genotype likelihood type.");
+  }
+
   /* G10 field: all 10 genotype likelihoods are defined */
   int gl_underflow = 1;
   for (unsigned int k = 0; k < 10; ++k)
@@ -367,7 +434,7 @@ void set_gl_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id)
   auto site_probs = msa.probs(sample_id, snv_id);
   auto gt_gl = snv.sample_lh + sample_id * snv.pl_per_sample;
 
-  for (int k = 0; k < 10; ++k)
+  for (size_t k = 0; k < msa.states(); ++k)
     site_probs[k] = 0.;
 
 #ifdef _RAXML_VCF_DEBUG
@@ -401,7 +468,7 @@ void set_pl_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id)
   auto site_probs = msa.probs(sample_id, snv_id);
   auto gt_pl = snv.sample_plh + sample_id * snv.pl_per_sample;
 
-  for (int k = 0; k < 10; ++k)
+  for (size_t k = 0; k < msa.states(); ++k)
     site_probs[k] = 0.;
 
 #ifdef _RAXML_VCF_DEBUG
@@ -460,25 +527,34 @@ void set_fpl_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id)
 void set_sample_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id,
                       VCFLikelihoodMode lh_mode)
 {
-  const int al1 = bcf_gt_allele(snv.sample_gt->p[sample_id * 2]);
-  const int al2 = bcf_gt_allele(snv.sample_gt->p[sample_id * 2 + 1]);
+  const size_t msa_states = msa.states();
+  bool msa_phased = (msa_states == 16);
 
-//  int phased2 = bcf_gt_is_phased(snv.sample_gt->p[sample_id * 2 + 1]);
-//  printf("phased: %d \n", phased2);
+  int32_t *gt_ptr = snv.sample_gt + sample_id * snv.max_ploidy;
+
+  bool haploid = (snv.max_ploidy == 1 || gt_ptr[1] == bcf_int32_vector_end);
+
+  const int al1 = bcf_gt_allele(gt_ptr[0]);
+  const int al2 = haploid ? al1 : bcf_gt_allele(gt_ptr[1]);
+
+//  printf("sample_id: %d, haploid: %d, al1: %d, al2: %d \n", sample_id, haploid, al1, al2);
+
+  bool gt_phased = haploid ? false : bcf_gt_is_phased(gt_ptr[1]);
+
+  /* VCF genotype likelihood fields do not support phasing now, but this might change later */
+  bool pr_phased = (lh_mode == VCFLikelihoodMode::none);
+  bool phased = msa_phased && gt_phased && pr_phased;
 
   auto gt1 = CORAX_STATE_CTZ(snv.al_states[al1]);
   auto gt2 = CORAX_STATE_CTZ(snv.al_states[al2]);
 
-  char c = '-';
-  if (al1 >= 0 && al2 >= 0)
-    c = gt10_to_char[gt1][gt2];
-
-  msa[sample_id][snv_id] = c;
-
+  char c = gap_char;
   auto site_probs = msa.probs(sample_id, snv_id);
 
   if (al1 >= 0 && al2 >= 0)
   {
+    c = phased ? gt16_to_char[gt1][gt2] : gt10_to_char[gt1][gt2];
+
     switch (lh_mode)
     {
       case VCFLikelihoodMode::g10:
@@ -497,9 +573,9 @@ void set_sample_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id,
       case VCFLikelihoodMode::none:
       {
         // no uncertainty specified, called genotype gets likelihood 1.0
-        corax_state_t ml_state =  corax_map_gt10[(int) c];
+        corax_state_t ml_state = phased ? corax_map_gt16[(int) c] : corax_map_gt10[(int) c];
         corax_state_t state = 1;
-        for (unsigned int k = 0; k < 10; ++k, state <<= 1)
+        for (unsigned int k = 0; k < msa_states; ++k, state <<= 1)
           site_probs[k] = (state & ml_state) ? 1.0 : 0.0;
       }
         break;
@@ -510,26 +586,43 @@ void set_sample_probs(MSA& msa, SNVRecord& snv, size_t snv_id, size_t sample_id,
   else
   {
     /* gap / missing data */
-    for (size_t k = 0; k < 10; ++k)
+    for (size_t k = 0; k < msa_states; ++k)
       site_probs[k] = 1.;
   }
 
-  /* adjustment for 16-state phased model: pYX = pXY */
-  if (msa.states() == 16)
+  /* convert unphased 10-state genotype into phased 16-state model: pYX = pXY */
+  if (msa_states == 16 && !pr_phased)
   {
     for (size_t k = 10; k < 16; ++k)
       site_probs[k] = site_probs[k-6];
   }
 
+  /* set ML genotype */
+  msa[sample_id][snv_id] = c;
+
 #ifdef _RAXML_VCF_DEBUG
-  if (!sample_id)
+  if (sample_id < 4)
   {
-    printf("site: %lu, gt: %c  probs: ", snv_id, c);
-    for (unsigned int k = 0; k < 10; ++k)
-      printf("%s=%lf ", gt_inv_map[k], site_probs[k]);
+    printf("site: %lu, sample: %lu, gt: %c  phased: %d,  probs: ", snv_id, sample_id, c, phased);
+    for (unsigned int k = 0; k < msa_states; ++k)
+      printf("%s=%lf ", haploid ? gt4_inv_map[k] : gt16_inv_map[k], site_probs[k]);
     printf("\n");
   }
 #endif
+}
+
+void set_allgap_snv(MSA& msa, size_t snv_id)
+{
+  for (size_t i = 0; i < msa.size(); ++i)
+  {
+    msa[i][snv_id] = gap_char;
+    if (msa.probabilistic())
+    {
+      auto site_probs = msa.probs(i, snv_id);
+      for (size_t k = 0; k < msa.states(); ++k)
+        site_probs[k] = 1.;
+    }
+  }
 }
 
 VCFStream& operator>>(VCFStream& stream, MSA& msa)
@@ -568,8 +661,10 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
 
   assert(msa.size() == sample_count);
 
-  // TODO hardcoded for now: diploid phased
-  msa.states(16);
+  msa.states(stream.num_states());
+  assert(msa.states() > 0);
+
+  LOG_DEBUG << "MSA states: " << msa.states() << endl;
 
   init_maps();
 
@@ -578,21 +673,36 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
 
   /* iterate over VCF lines, ie SNVs */
   size_t j = 0;
+  size_t invalid_lines = 0;
   while (bcf_read1(fp, hdr, rec) >= 0)
   {
     bcf_unpack(rec, BCF_UN_ALL);
 
-    /* read fixed portion of VCF line -> eg REF/ALT allele names */
-    read_snv_fixed(snv_rec, hdr, rec);
+    try
+    {
+      /* read fixed portion of VCF line -> eg REF/ALT allele names */
+      read_snv_fixed(snv_rec, hdr, rec);
 
-    msa.site_name(j, snv_rec.snv_name);
+      msa.site_name(j, snv_rec.snv_name);
 
-    /* load per-sample genotype likelihoods into intermediate array  */
-    read_snv_sample_data(snv_rec, hdr, rec, lh_mode);
+      /* load per-sample genotype likelihoods into intermediate array  */
+      read_snv_sample_data(snv_rec, hdr, rec, lh_mode);
 
-    /* iterate over per-sample records and set genotype likelihoods to MSA*/
-    for (size_t i = 0; i < sample_count; ++i)
-      set_sample_probs(msa, snv_rec, j, i, lh_mode);
+      /* iterate over per-sample records and set genotype likelihoods to MSA*/
+      for (size_t i = 0; i < sample_count; ++i)
+        set_sample_probs(msa, snv_rec, j, i, lh_mode);
+    }
+    catch (vcf_parse_errpr& e)
+    {
+      if (stream.skip_invalid_snvs())
+      {
+        LOG_WARN << "ERROR: " << e.what() << " -> data line ignored!" << endl;
+        set_allgap_snv(msa, j);
+        invalid_lines++;
+      }
+      else
+        throw e;
+    }
 
     j++;
 
@@ -601,6 +711,13 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
   }
 
   assert(j == site_count);
+
+  if (invalid_lines > 0)
+  {
+    LOG_WARN << endl << "WARNING: VCF data lines with parsing errors: " << invalid_lines << endl << endl;
+    if (invalid_lines == site_count)
+      throw runtime_error("No valid VCF data lines found!");
+  }
 
   if (snv_rec.lh_underflow > 0)
   {
@@ -616,7 +733,9 @@ VCFStream& operator>>(VCFStream& stream, MSA& msa)
   if ( (ret = hts_close(fp)) )
     throw runtime_error("hts_close() returned non-zero status: " + to_string(ret));
 
-//  pllmod_msa_save_phylip(msa.corax_msa(), "vcfout.phy");
+#ifdef _RAXML_VCF_DEBUG
+  corax_phylip_save("vcfout.phy", msa.pll_msa());
+#endif
 
   return stream;
 }

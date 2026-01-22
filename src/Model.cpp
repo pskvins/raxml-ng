@@ -8,31 +8,6 @@ const vector<int> ALL_MODEL_PARAMS = {CORAX_OPT_PARAM_FREQUENCIES, CORAX_OPT_PAR
                                       CORAX_OPT_PARAM_BRANCH_LEN_SCALER,
                                       CORAX_OPT_PARAM_BRANCHES_ITERATIVE};
 
-const unordered_map<DataType,unsigned int,EnumClassHash>  DATATYPE_STATES { {DataType::dna, 4},
-                                                                            {DataType::protein, 20},
-                                                                            {DataType::binary, 2},
-                                                                            {DataType::genotype10, 10},
-                                                                            {DataType::genotype16, 16}
-                                                                          };
-
-const unordered_map<DataType,const corax_state_t*,EnumClassHash>  DATATYPE_MAPS {
-  {DataType::dna, corax_map_nt},
-  {DataType::protein, corax_map_aa},
-  {DataType::binary, corax_map_bin},
-  {DataType::genotype10, corax_map_gt10},
-  {DataType::genotype16, corax_map_gt16}
-};
-
-const unordered_map<DataType,string,EnumClassHash>  DATATYPE_PREFIX { {DataType::dna, "DNA"},
-                                                                      {DataType::protein, "PROT"},
-                                                                      {DataType::binary, "BIN"},
-                                                                      {DataType::genotype10, "GT"},
-                                                                      {DataType::genotype16, "GP"},
-                                                                      {DataType::multistate, "MULTI"},
-                                                                      {DataType::autodetect, "AUTO"}
-                                                                    };
-
-
 
 // TODO move it out of here
 class parse_error : public runtime_error
@@ -178,7 +153,7 @@ Model::Model (DataType data_type, const std::string &model_string) :
 
 const corax_state_t * Model::charmap() const
 {
-  return _custom_charmap ? _custom_charmap.get() : DATATYPE_MAPS.at(_data_type);
+  return _custom_charmap ? _custom_charmap.get() : DatatypeCharmaps.at(_data_type);
 }
 
 void Model::init_from_string(const std::string &model_string)
@@ -202,7 +177,7 @@ void Model::init_from_string(const std::string &model_string)
     assert(_custom_charmap);
   }
   else
-    _num_states = DATATYPE_STATES.at(_data_type);
+    _num_states = DatatypeStates.at(_data_type);
 
   corax_mixture_model_t * mix_model = init_mix_model(model_name);
 
@@ -285,7 +260,7 @@ void Model::autodetect_data_type(const std::string &model_name)
 corax_mixture_model_t * Model::init_mix_model(const std::string &model_name)
 {
   const char * model_cstr = model_name.c_str();
-  const std::string& prefix = DATATYPE_PREFIX.at(_data_type);
+  const std::string& prefix = DatatypePrefix.at(_data_type);
   corax_mixture_model_t * mix_model = nullptr;
 
   if (corax_util_model_exists_protmix(model_cstr))
@@ -1100,6 +1075,7 @@ void Model::init_state_names() const
       {
         auto idx = CORAX_STATE_CTZ(state);
         _state_names[idx] = state_name;
+//        printf("char: %s, state: %d, popcnt: %u\n", state_name.c_str(), idx, popcnt);
       }
     }
   }

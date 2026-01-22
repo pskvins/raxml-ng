@@ -1232,7 +1232,8 @@ void load_msa(RaxmlInstance& instance)
   LOG_INFO_TS << "Reading alignment from file: " << opts.msa_file << endl;
 
   /* load MSA */
-  auto msa = msa_load_from_file(opts.msa_file, opts.msa_format, opts);
+  auto expected_data_type = parted_msa.model(0).data_type();
+  auto msa = msa_load_from_file(opts.msa_file, opts.msa_format, opts, expected_data_type);
   
   if (!msa.size())
     throw runtime_error("Alignment file is empty!");

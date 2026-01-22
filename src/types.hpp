@@ -13,6 +13,19 @@
 
 #include <corax/corax.h>
 
+/*
+ * workaround needed for using enum as std::map key
+ * code from: http://stackoverflow.com/a/24847480
+ * */
+struct EnumClassHash
+{
+  template <typename T>
+  std::size_t operator()(T t) const
+  {
+      return static_cast<std::size_t>(t);
+  }
+};
+
 
 enum class StartingTree
 {
@@ -74,6 +87,37 @@ enum class DataType
   multistate,
   genotype10,
   genotype16
+};
+
+const std::unordered_map<DataType,unsigned int,EnumClassHash>  DatatypeStates
+{
+  {DataType::autodetect, 0},
+  {DataType::dna, 4},
+  {DataType::protein, 20},
+  {DataType::binary, 2},
+  {DataType::multistate, 0},   // variable
+  {DataType::genotype10, 10},
+  {DataType::genotype16, 16}
+};
+
+const std::unordered_map<DataType,const corax_state_t*,EnumClassHash>  DatatypeCharmaps
+{
+  {DataType::dna, corax_map_nt},
+  {DataType::protein, corax_map_aa},
+  {DataType::binary, corax_map_bin},
+  {DataType::genotype10, corax_map_gt10},
+  {DataType::genotype16, corax_map_gt16}
+};
+
+const std::unordered_map<DataType,std::string,EnumClassHash>  DatatypePrefix
+{
+  {DataType::dna, "DNA"},
+  {DataType::protein, "PROT"},
+  {DataType::binary, "BIN"},
+  {DataType::genotype10, "GT"},
+  {DataType::genotype16, "GP"},
+  {DataType::multistate, "MULTI"},
+  {DataType::autodetect, "AUTO"}
 };
 
 enum class ParamValue
@@ -203,19 +247,6 @@ typedef std::vector<WeightVector> WeightVectorList;
 typedef std::unordered_map<size_t, WeightVector> WeightVectorMap;
 
 typedef std::default_random_engine RandomGenerator;
-
-/*
- * workaround needed for using enum as std::map key
- * code from: http://stackoverflow.com/a/24847480
- * */
-struct EnumClassHash
-{
-  template <typename T>
-  std::size_t operator()(T t) const
-  {
-      return static_cast<std::size_t>(t);
-  }
-};
 
 /* generic exception class */
 class RaxmlException : public std::exception
