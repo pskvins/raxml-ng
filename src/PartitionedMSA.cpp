@@ -94,9 +94,9 @@ uintVector PartitionedMSA::get_site_part_assignment() const
   return spa;
 }
 
-const uintVector& PartitionedMSA::site_part_map() const
+const uintVector& PartitionedMSA::site_part_map(bool force_update) const
 {
-  if (_site_part_map.empty() && part_count() > 1)
+  if (force_update || (_site_part_map.empty() && part_count() > 1))
     _site_part_map = get_site_part_assignment();
 
   return _site_part_map;
@@ -179,6 +179,9 @@ void PartitionedMSA::split_msa()
 
   if (need_split)
   {
+    /* make sure site-partition map is initialized */
+    site_part_map(true);
+
     /* split MSA into partitions */
     corax_msa_t ** part_msa_list =
         corax_msa_split(_full_msa.pll_msa(), site_part_map().data(), part_count());

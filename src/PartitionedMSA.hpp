@@ -29,7 +29,7 @@ public:
   const IDVector& unassigned_sites()  const { return _unassigned_sites; };
 
   size_t full_msa_site(size_t index, size_t site) const;
-  const uintVector& site_part_map() const;
+  const uintVector& site_part_map(bool force_update = false) const;
   IdPairVector full_to_parted_sitemap() const;
 
   size_t taxon_count() const { return _taxon_names.size(); };
