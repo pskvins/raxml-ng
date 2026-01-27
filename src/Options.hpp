@@ -178,7 +178,8 @@ public:
             (strcasecmp(model_file.c_str(), "auto") == 0) || \
             (strcasecmp(model_file.c_str(), "dna") == 0) || \
             (strcasecmp(model_file.c_str(), "aa") == 0) || \
-            (strcasecmp(model_file.c_str(), "bin") == 0);
+            (strcasecmp(model_file.c_str(), "bin") == 0) ||
+            (strncasecmp(model_file.c_str(), "auto=", 5) == 0);
   }
 
   unsigned int num_bootstrap_ml_trees() const;

@@ -204,6 +204,20 @@ void init_part_info(RaxmlInstance& instance)
     throw runtime_error("Alignment file not found: " + opts.msa_file);
   }
 
+  /* process model file modifiers */
+  auto model_file = opts.model_file;
+  bool model_global = false;
+  if (!sysutil_file_exists(model_file))
+  {
+    if (isprefixi(opts.model_file, "auto="))
+      model_file = opts.model_file.substr(5);
+    else if (isprefixi(opts.model_file, "all="))
+    {
+      model_file = opts.model_file.substr(4);
+      model_global = true;
+    }
+  }
+
   /* check if we have a binary input file */
   if (opts.msa_format == FileFormat::binary ||
       (opts.msa_format == FileFormat::autodetect && RBAStream::rba_file(opts.msa_file)))
@@ -248,12 +262,13 @@ void init_part_info(RaxmlInstance& instance)
     LOG_INFO << endl;
   }
   /* check if model is a file */
-  else if (sysutil_file_exists(opts.model_file))
+  else if (sysutil_file_exists(model_file))
   {
     // read partition definitions from file
     try
     {
-      RaxmlPartitionStream partfile(opts.model_file, ios::in);
+      RaxmlPartitionStream partfile(model_file, ios::in);
+      partfile.ignore_range(model_global);
       partfile >> parted_msa;
     }
     catch(exception& e)

@@ -130,12 +130,17 @@ class RaxmlPartitionStream : public std::fstream
 public:
   RaxmlPartitionStream(const std::string& fname, bool use_range_string = false) :
     std::fstream(fname, std::ios::out), _offset(0), _print_model_params(false),
-    _use_range_string(use_range_string) {}
+    _use_range_string(use_range_string), _ignore_range(false) {}
   RaxmlPartitionStream(const std::string& fname, std::ios_base::openmode mode) :
-    std::fstream(fname, mode), _offset(0), _print_model_params(false), _use_range_string(false) {}
+    std::fstream(fname, mode), _offset(0), _print_model_params(false),
+    _use_range_string(false), _ignore_range(false) {}
 
   bool print_model_params() const { return _print_model_params; }
   void print_model_params(bool value) { _print_model_params = value; }
+
+  /* should site range be ignored, and the first model applied to all MSA sites? */
+  bool ignore_range() const { return _ignore_range; }
+  void ignore_range(bool value) { _ignore_range = value; }
 
   void reset() { _offset = 0; }
   void put_range(const PartitionInfo& part_info)
@@ -154,6 +159,7 @@ private:
   size_t _offset;
   bool _print_model_params;
   bool _use_range_string;
+  bool _ignore_range;
 };
 
 class FileIOStream : public std::fstream

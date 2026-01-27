@@ -114,13 +114,19 @@ RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionInfo& pa
 
 RaxmlPartitionStream& operator>>(RaxmlPartitionStream& stream, PartitionedMSA& parted_msa)
 {
-  while (stream.peek() != EOF)
+  bool terminate = false;
+  while (stream.peek() != EOF && !terminate)
   {
     PartitionInfo pinfo;
     try
     {
       stream >> pinfo;
       assert(!pinfo.name().empty() && !pinfo.range_string().empty());
+      if (stream.ignore_range())
+      {
+        pinfo.range_string("all");
+        terminate = true;
+      }
       parted_msa.append_part_info(std::move(pinfo));
     }
     catch (empty_line_exception& e)
