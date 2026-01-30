@@ -102,12 +102,13 @@ static struct option long_options[] =
   {"stop-rule",          required_argument, 0, 0 },  /*  69 */
   {"ebg",                no_argument,       0, 0 },  /*  70 */
   {"fast",               no_argument,       0, 0 },  /*  71 */
-  {"opt-freerate",       required_argument, 0, 0 },  /*  72 */
-  {"gcf",                optional_argument, 0, 0 },  /*  73 */
-  {"modeltest",          optional_argument, 0, 0 },  /*  74 */
-  {"moose",              optional_argument, 0, 0 },  /*  75 */
-  {"moose-options",      required_argument, 0, 0 },  /*  76 */
-  {"mutmap",             optional_argument, 0, 0 },  /*  77 */
+  {"allfast",            no_argument,       0, 0 },  /*  72 */
+  {"opt-freerate",       required_argument, 0, 0 },  /*  73 */
+  {"gcf",                optional_argument, 0, 0 },  /*  74 */
+  {"modeltest",          optional_argument, 0, 0 },  /*  75 */
+  {"moose",              optional_argument, 0, 0 },  /*  76 */
+  {"moose-options",      required_argument, 0, 0 },  /*  77 */
+  {"mutmap",             optional_argument, 0, 0 },  /*  78 */
 
   { 0, 0, 0, 0 }
 };
@@ -1215,6 +1216,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               opts.use_bs_pars = false;
               opts.use_par_pars = false;
               opts.use_pythia = false;
+              opts.use_pars_brlen = false;
               opts.allgap_seqs_action = AbnormalSequenceAction::keep;
               opts.dup_seqs_action = AbnormalSequenceAction::keep;
               opts.stopping_rule = StoppingRule::none;
@@ -1222,6 +1224,16 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
               if (!lh_epsilon_set)
                 opts.lh_epsilon = DEF_LH_EPSILON_V11;
               opts.lh_epsilon_brlen_triplet = DEF_LH_EPSILON_V11;
+            }
+            else if (eopt == "compat-v12")
+            {
+              compat_ver = 120;
+              opts.use_pythia = false;
+              opts.use_pars_brlen = false;
+              opts.allgap_seqs_action = AbnormalSequenceAction::keep;
+              opts.dup_seqs_action = AbnormalSequenceAction::keep;
+              opts.stopping_rule = StoppingRule::none;
+              opts.topology_opt_method = TopologyOptMethod::classic;
             }
             else
               throw InvalidOptionValueException("Unknown extra option: " + string(eopt));
@@ -1520,7 +1532,19 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         opts.use_pythia = false;
         opts.use_pars_spr = true;
         break;
-      case 72: /* freerate optimization method */
+        /* --allfast mode: fast ML tree search + EBG branch supports */
+        case 72:
+          opts.command = Command::all;
+          if (optarg_tree.empty())
+            optarg_tree = "pars{1}";
+          opts.topology_opt_method = TopologyOptMethod::simplified;
+          opts.stopping_rule = StoppingRule::kh_mult;
+          opts.use_pythia = false;
+          opts.use_pars_spr = true;
+          opts.bs_metrics.clear();
+          opts.bs_metrics.insert(BranchSupportMetric::ebg);
+          break;
+      case 73: /* freerate optimization method */
         if (strcasecmp(optarg, "em") == 0) {
           opts.free_rate_opt_method = FreerateOptMethod::EM;
         } else if (strcasecmp(optarg, "lbfgsb") == 0 || strcasecmp(optarg, "bfgs") == 0) {
@@ -1530,7 +1554,7 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         } else
           throw InvalidOptionValueException("Unknown FreeRate optimization method: " + string(optarg));
         break;
-      case 73: /* gcf: compute gene concordance factors */
+      case 74: /* gcf: compute gene concordance factors */
         opts.command = Command::support;
         opts.bs_metrics.clear();
         opts.bs_metrics.insert(BranchSupportMetric::gcf);
@@ -1540,8 +1564,8 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           optarg_tree = optarg;
         num_commands++;
         break;
-      case 74: /* modeltest (for backward-compatibility) */
-      case 75: /* model selection / moose */
+      case 75: /* modeltest (for backward-compatibility) */
+      case 76: /* model selection / moose */
         opts.command = Command::modeltest;
         if (optarg)
           optarg_modeltest = optarg;
@@ -1549,10 +1573,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           optarg_tree = "pars{1}";
         num_commands++;
         break;
-      case 76: /* model selection options */
+      case 77: /* model selection options */
         optarg_modeltest = optarg;
         break;
-      case 77: /* mutation mapping */
+      case 78: /* mutation mapping */
         opts.command = Command::mutmap;
         opts.use_pattern_compression = false;
         opts.use_repeats = false;
@@ -1660,6 +1684,7 @@ void CommandLineParser::print_help()
             "Command shortcuts (mutually exclusive):\n"
             "  --search1                                  Alias for: --search --tree pars{1}\n"
             "  --fast                                     Alias for: --search --tree pars{1} --opt-topology simplified --stop-rule kh-mult\n"
+            "  --allfast                                  Alias for: --all --tree pars{1} --opt-topology simplified --stop-rule kh-mult --bs-metric ebg\n"
             "  --loglh                                    Alias for: --evaluate --opt-model off --opt-branches off --nofiles --log result\n"
             "  --rf                                       Alias for: --rfdist --nofiles --log result\n"
             "  --pt                                       Alias for: --pythia --nofiles --log result\n"

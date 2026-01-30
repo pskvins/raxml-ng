@@ -5,8 +5,8 @@
 
 // defaults
 #define RAXML_DEF_START_TREE      "rand{10},pars{10}"
-#define RAXML_DEF_START_TREE1     "pars{1}}"
-#define RAXML_DEF_START_TREE1_V11 "rand{1}}"
+#define RAXML_DEF_START_TREE1     "pars{1}"
+#define RAXML_DEF_START_TREE1_V11 "rand{1}"
 
 #define RAXML_LOGLH_TOLERANCE     1e-12
 
