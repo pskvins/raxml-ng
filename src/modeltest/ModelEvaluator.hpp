@@ -72,6 +72,12 @@ public:
    */
   static void reduce(void *context, double *data, size_t size, int op);
 
+
+  /** Copy rate-heterogeneity parameters (α, proportion of invariant sites, rates and weights) from other model evaluation.
+   * @return true if parameters were copied successfully, false otherwise
+   */
+  bool copy_rhas_parameters(const ModelEvaluator *other);
+
 private:
   size_t _proposed_thread_count;
 

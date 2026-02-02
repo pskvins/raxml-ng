@@ -5,6 +5,7 @@
 #include <iostream>
 #include <vector>
 #include <mutex>
+#include <unordered_map>
 #include "DistributedScheduling.hpp"
 #include "ModelEvaluator.hpp"
 #include "../PartitionedMSA.hpp"
@@ -30,13 +31,15 @@ class ModelScheduler final {
         void finalize();
         ~ModelScheduler() = default; 
 
-        void update_result(ModelEvaluator &evaluation, ModelEvaluation result, bool announce = true, bool checkpoint = true);
+        void update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce = true, bool write_checkpoint = true);
         void print_results(int partition_index, ModelEvaluation &result);
         ModelEvaluator *get_next_model(); 
+        ModelEvaluator *get_by_descriptor(const PartitionCandidateModel &candidate_model);
         vector<vector<ModelEvaluation const *>> collect_finished_results_by_partition() const;
         void fetch_global_results();
         void print_xml(std::ostream &os) const;
 
+        const SubstitutionModelDescriptor &get_reference_model();
 private:
     std::mutex mutex_evaluation;
     std::mutex mutex_log;
@@ -53,11 +56,15 @@ private:
 
     uint64_t evaluation_index;
     vector<ModelEvaluator> evaluators;
+
+    /** Keep map that points into the evaluators array to allow addressing by candidate model */
+    unordered_map<PartitionCandidateModel, uint64_t> evaluator_map;
+
     Heuristics heuristics;
     DistributedSchedulingImpl distributed_scheduling;
 
     void _fetch_global_results();
-    void _update_result(ModelEvaluator &evaluation, ModelEvaluation result, bool announce = true, bool checkpoint = true);
+    void _update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce = true, bool write_checkpoint = true);
     ModelEvaluator &_get_evaluator(size_t index);
 
     using EvaluationStatusCounts = std::array<uint64_t, static_cast<uint64_t>(EvaluationStatus::FINISHED) + 1>;

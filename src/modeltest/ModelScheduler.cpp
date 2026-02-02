@@ -8,6 +8,7 @@
 #include <functional>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <unistd.h>
 
 
@@ -111,10 +112,10 @@ ModelScheduler::ModelScheduler(
    checkpoint_manager{checkpoint_manager},
    partition_count{msa.part_count()},
    branch_count{BasicTree(msa.taxon_count()).num_branches()},
-   candidate_models{_candidate_models},
+   candidate_models{std::move(_candidate_models)},
    reference_model{candidate_models.at(0).substitution_model},
    evaluation_index{0},
-   evaluators{build_evaluators(msa, options, reference_model, resource_estimator, candidate_models, partition_count)},
+   evaluators{build_evaluators(msa, options, reference_model, std::move(resource_estimator), candidate_models, partition_count)},
    heuristics{partition_count, options.modeltest_heuristics, get_selected_rhas(candidate_models, reference_model), reference_model, options.free_rate_min_categories, options.free_rate_max_categories, options.modeltest_significant_ic_delta, options.modeltest_rhas_heuristic_mode},
    distributed_scheduling{determine_binary_candidates_size(evaluators)},
    candidate_model_descriptor_width(max_descriptor_width(candidate_models.cbegin(), candidate_models.cend()))
@@ -126,6 +127,10 @@ ModelScheduler::ModelScheduler(
                     return a.priority() > b.priority();
                 });
 
+    for (auto i = 0UL; i < evaluators.size(); ++i) {
+        evaluator_map.emplace(PartitionCandidateModel { evaluators[i].partition_index(), evaluators[i].candidate_model() }, i);
+    }
+
     read_from_checkpoint(checkpoint_manager);
     globally_init_evaluation_index();
 }
@@ -134,20 +139,13 @@ void ModelScheduler::read_from_checkpoint(CheckpointManager &checkpoint_manager)
 {
     const auto t0 = global_timer().elapsed_seconds();
 
-    std::unordered_map<PartitionCandidateModel, size_t> evaluator_index;
-    for (size_t i = 0; i < evaluators.size(); ++i)
-    {
-        PartitionCandidateModel key { evaluators.at(i).partition_index(), evaluators.at(i).candidate_model() };
-        evaluator_index[key] = i;
-    }
-
     for (auto &checkpointed_candidate : checkpoint_manager.get_model_candidates())
     {
         const PartitionCandidateModel &key = checkpointed_candidate.first;
         ModelEvaluation evaluation = checkpointed_candidate.second;
 
-        auto it = evaluator_index.find(key);
-        if (it == evaluator_index.end()) {
+        auto it = evaluator_map.find(key);
+        if (it == evaluator_map.end()) {
             // Set of candidate models changed because of user parameters, disregard model
             continue;
         }
@@ -157,9 +155,9 @@ void ModelScheduler::read_from_checkpoint(CheckpointManager &checkpoint_manager)
         const ICScoreCalculator ic_calc(free_params, msa.part_info(key.partition).stats().site_count);
         evaluation.ic_score = ic_calc.compute(options.model_selection_criterion, evaluation.loglh);
 
-//        printf("Desc: %s, Model: %s, LogLH: %lf,  BIC: %lf, FreeParam: %u\n",
-//               key.candidate_model.descriptor().c_str(),  evaluation.model.to_string(true).c_str(),
-//               evaluation.loglh, evaluation.ic_score, free_params);
+        DBG("ModelTest Desc: %s, Model: %s, LogLH: %lf,  BIC: %lf, FreeParam: %u\n",
+               key.candidate_model.descriptor().c_str(),  evaluation.model.to_string(true).c_str(),
+               evaluation.loglh, evaluation.ic_score, free_params);
 
         update_result(evaluators.at(it->second), evaluation, false, false);
     }
@@ -372,3 +370,16 @@ ModelScheduler::EvaluationStatusCounts ModelScheduler::_collect_progress() const
     return counts;
 }
 
+ModelEvaluator *ModelScheduler::get_by_descriptor(const PartitionCandidateModel &candidate_model) {
+    auto it = evaluator_map.find(candidate_model);
+
+    if (it == evaluator_map.cend()) {
+        return nullptr;
+    }
+
+    return &evaluators.at(it->second);
+}
+
+const SubstitutionModelDescriptor &ModelScheduler::get_reference_model() {
+    return reference_model;
+}

@@ -6,6 +6,7 @@
 #include "../ICScoreCalculator.hpp"
 #include "Heuristics.hpp"
 #include "ModelDefinitions.hpp"
+#include "ModelEvaluator.hpp"
 #include "ModelScheduler.hpp"
 #include "corax/tree/treeinfo.h"
 
@@ -189,6 +190,25 @@ const vector<Model>& ModelTest::optimize_model()
 
     evaluator->barrier();
     const Model &model = evaluator->get_result().model;
+
+    // See if reference model is already evaluated, copy RHAS parameters if possible
+    {
+        const auto &reference_model = model_scheduler.get_reference_model();
+        const auto equivalent_reference_descriptor = PartitionCandidateModel { 
+                evaluator->partition_index(),
+                ModelDescriptor (
+                    evaluator->candidate_model().datatype,
+                    reference_model.matrix_name,
+                    reference_model.base_frequency,
+                    evaluator->candidate_model().rate_heterogeneity.type,
+                    evaluator->candidate_model().rate_heterogeneity.category_count ) };
+        const auto equivalent_reference = model_scheduler.get_by_descriptor(equivalent_reference_descriptor);
+        const bool rhas_copied = evaluator->copy_rhas_parameters(equivalent_reference);
+        if (rhas_copied) {
+            LOG_THREAD_TS << " copied RHAS parameters from reference, model parameters: " << evaluator->get_result().model.to_string(true) << endl;
+        }
+    }
+
     TreeInfo treeinfo(options, tree, msa, tip_msa_idmap, assignment, evaluator->partition_index(), model);
 
     treeinfo.custom_reduce(evaluator, ModelEvaluator::reduce);

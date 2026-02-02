@@ -165,3 +165,39 @@ const size_t &ModelEvaluator::proposed_thread_count() const
 {
     return _proposed_thread_count;
 }
+
+bool ModelEvaluator::copy_rhas_parameters(const ModelEvaluator *const other) {
+    double results_present = (other != nullptr) && (other->get_status() == EvaluationStatus::FINISHED) ? 1 : 0;
+    // Synchronize evaluation status of equivalent reference model to circumvent race condition where its evaluation
+    // concludes inbetween two threads trying to access the evaluation results.
+    ModelEvaluator::reduce(this, &results_present, 1, CORAX_REDUCE_MAX);
+
+    if (results_present != 1) {
+        return false;
+    }
+    
+    const auto &other_model = other->get_result().model;
+    auto &this_model = _result.model;
+    auto rhas = _candidate_model->rate_heterogeneity.type;
+
+    assert(other_model.num_ratecats() == this_model.num_ratecats());
+
+    if (rhas == RateHeterogeneityType::INVARIANT_FREE_RATE ||
+        rhas == RateHeterogeneityType::INVARIANT ||
+        rhas == RateHeterogeneityType::INVARIANT_GAMMA) {
+            this_model.pinv(other_model.pinv());
+    }
+
+    if (rhas == RateHeterogeneityType::INVARIANT_GAMMA ||
+        rhas == RateHeterogeneityType::GAMMA) {
+        this_model.alpha(other_model.alpha());
+    }
+
+    if (rhas == RateHeterogeneityType::FREE_RATE || 
+        rhas == RateHeterogeneityType::INVARIANT_FREE_RATE) {
+        this_model.ratecat_rates(other_model.ratecat_rates());
+        this_model.ratecat_weights(other_model.ratecat_weights());
+    }
+
+    return true;
+}
