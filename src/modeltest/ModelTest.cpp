@@ -18,7 +18,7 @@ static thread_local std::unique_ptr<std::ofstream> thread_log;
 Options modify_options(const Options &other)
 {
   Options options(other);
-  options.lh_epsilon = 0.01;                  // Use same LH-epsilon as ModelTest-NG
+  options.lh_epsilon = DEF_LH_EPSILON_MOOSE;
   options.brlen_linkage = CORAX_BRLEN_LINKED; // Partitions are computed in isolation, no need for scalers
 
   return options;

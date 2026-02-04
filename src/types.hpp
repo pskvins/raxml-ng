@@ -210,7 +210,8 @@ namespace ConsenseCutoff
 enum class FreerateOptMethod
 {
   AUTO = 0,
-  EM,
+  EM_BFGS,
+  EM_BRENT,
   LBFGSB
 };
 

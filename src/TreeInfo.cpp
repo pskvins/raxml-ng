@@ -66,12 +66,12 @@ void TreeInfo::init(const Options &opts, const Tree &tree, const PartitionedMSA 
   _check_lh_impr = opts.safety_checks.isset(SafetyCheck::model_lh_impr);
   _use_old_constraint = opts.use_old_constraint;
   _use_spr_fastclv = opts.use_spr_fastclv;
-  _param_epsilon = RAXML_PARAM_EPSILON_MT;
+  _param_epsilon = RAXML_PARAM_EPSILON;
   _param_opt_order = PARAM_OPT_ORDER_MODELTEST;
 
-  /* during model testing, use EM by default since it is faster */
+  /* during model testing, use EM+Brent by default since it is faster */
   _freerate_opt = (opts.free_rate_opt_method != FreerateOptMethod::AUTO) ?
-                                          opts.free_rate_opt_method : FreerateOptMethod::EM;
+                                          opts.free_rate_opt_method : FreerateOptMethod::EM_BRENT;
 
   size_t partition_count = 1;
 
@@ -466,15 +466,21 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
         {
           switch (_freerate_opt)
           {
-            case FreerateOptMethod::EM:
+            case FreerateOptMethod::EM_BFGS:
+            case FreerateOptMethod::EM_BRENT:
+            {
+              const corax_bool_t use_brent = _freerate_opt == FreerateOptMethod::EM_BRENT;
               new_loglh = -1 * corax_algo_opt_rates_weights_em_treeinfo(_pll_treeinfo,
                                                                         RAXML_FREERATE_MIN,
                                                                         RAXML_FREERATE_MAX,
                                                                         _brlen_min,
                                                                         _brlen_max,
                                                                         RAXML_BFGS_FACTOR,
-                                                                        _param_epsilon);
+                                                                        _param_epsilon,
+                                                                        lh_epsilon,
+                                                                        use_brent);
               break;
+            }
             case FreerateOptMethod::LBFGSB:
             case FreerateOptMethod::AUTO:
               new_loglh = -1 * corax_algo_opt_rates_weights_treeinfo(_pll_treeinfo,
@@ -483,7 +489,8 @@ double TreeInfo::optimize_params(int params_to_optimize, double lh_epsilon)
                                                                      _brlen_min,
                                                                      _brlen_max,
                                                                      RAXML_BFGS_FACTOR,
-                                                                     _param_epsilon);
+                                                                     _param_epsilon,
+                                                                     lh_epsilon);
               break;
           }
 

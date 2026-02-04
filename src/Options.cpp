@@ -309,10 +309,12 @@ string Options::free_rate_opt_method_name() const
     {
     case FreerateOptMethod::AUTO:
         return "AUTO";
-    case FreerateOptMethod::EM:
-        return "Expectation-Maximization";
+    case FreerateOptMethod::EM_BFGS:
+        return "weights: Expectation-Maximization, rates: L-BFGS-B";
+    case FreerateOptMethod::EM_BRENT:
+        return "weights: Expectation-Maximization, rates: Brent";
     case FreerateOptMethod::LBFGSB:
-        return "L-BFGS-B";
+        return "weights: L-BFGS-B, rates: L-BFGS-B";
     default:
         return "UNKNOWN";
     }

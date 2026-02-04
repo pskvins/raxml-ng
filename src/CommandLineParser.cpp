@@ -1545,8 +1545,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
           opts.bs_metrics.insert(BranchSupportMetric::ebg);
           break;
       case 73: /* freerate optimization method */
-        if (strcasecmp(optarg, "em") == 0) {
-          opts.free_rate_opt_method = FreerateOptMethod::EM;
+        if (strcasecmp(optarg, "em-bfgs") == 0) {
+          opts.free_rate_opt_method = FreerateOptMethod::EM_BFGS;
+        } else if (strcasecmp(optarg, "em-brent") == 0) {
+          opts.free_rate_opt_method = FreerateOptMethod::EM_BRENT;
         } else if (strcasecmp(optarg, "lbfgsb") == 0 || strcasecmp(optarg, "bfgs") == 0) {
           opts.free_rate_opt_method = FreerateOptMethod::LBFGSB;
         } else if (strcasecmp(optarg, "auto") == 0) {

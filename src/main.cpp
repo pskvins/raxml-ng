@@ -3383,14 +3383,14 @@ void init_parallel_buffers(const RaxmlInstance& instance)
 
 
   size_t total_freerate_category_count = 0;
-  if (instance.opts.free_rate_opt_method == FreerateOptMethod::EM)
+  if (instance.opts.free_rate_opt_method != FreerateOptMethod::LBFGSB)
   {
     for (const auto &part : parted_msa.part_list())
     {
-        if (!part.model().param_estimated(CORAX_OPT_PARAM_FREE_RATES))
-            continue;
+      if (!part.model().param_estimated(CORAX_OPT_PARAM_FREE_RATES))
+          continue;
 
-        total_freerate_category_count += part.model().num_ratecats();
+      total_freerate_category_count += part.model().num_ratecats();
     }
   }
 
