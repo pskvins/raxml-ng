@@ -27,19 +27,20 @@ Options modify_options(const Options &other)
 
 const std::vector<string> get_matrix_names(const DataType datatype)
 {
-  switch (datatype) {
-  case DataType::dna:
-    return dna_substitution_matrix_names;
-  case DataType::protein:
-    return aa_substitution_matrix_names;
-  case DataType::binary:
-    return std::vector<string>({"BIN"});
+  switch (datatype)
+  {
+    case DataType::dna:
+      return dna_substitution_matrix_names;
+    case DataType::protein:
+      return aa_substitution_matrix_names;
+    case DataType::binary:
+      return std::vector<string>({"BIN"});
 
-  case DataType::autodetect:
-  case DataType::multistate:
-  case DataType::genotype10:
-  case DataType::genotype16:
-    throw unsupported_datatype_error();
+    case DataType::autodetect:
+    case DataType::multistate:
+    case DataType::genotype10:
+    case DataType::genotype16:
+      throw unsupported_datatype_error();
   }
 
   return {};
@@ -57,28 +58,32 @@ vector<ModelDescriptor> ModelTest::generate_candidate_model_names(const DataType
   const auto subst_models =
       options.modeltest_subst_models.empty() ? get_matrix_names(dt) : options.modeltest_subst_models;
 
-  for (const auto &subst_model : subst_models) {
-    for (const auto &frequency_type : default_frequency_type) {
-      for (const auto &rate_heterogeneity : options.modeltest_rhas) {
-        switch (rate_heterogeneity) {
-        case RateHeterogeneityType::FREE_RATE:
-        case RateHeterogeneityType::INVARIANT_FREE_RATE:
-          // If category range is not positive, skip freerate models
-          if (freerate_cmin == 0 && freerate_cmax == 0) {
-            continue;
-          }
+  for (const auto &subst_model : subst_models)
+  {
+    for (const auto &frequency_type : default_frequency_type)
+    {
+      for (const auto &rate_heterogeneity : options.modeltest_rhas)
+      {
+        switch (rate_heterogeneity)
+        {
+          case RateHeterogeneityType::FREE_RATE:
+          case RateHeterogeneityType::INVARIANT_FREE_RATE:
+            // If category range is not positive, skip freerate models
+            if (freerate_cmin == 0 && freerate_cmax == 0) {
+              continue;
+            }
 
-          for (unsigned int c = freerate_cmin; c <= freerate_cmax; ++c) {
-            candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, c);
-          }
-          break;
-        case RateHeterogeneityType::GAMMA:
-        case RateHeterogeneityType::INVARIANT_GAMMA:
-          candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, gamma_category_count);
-          break;
-        default:
-          candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity);
-          break;
+            for (unsigned int c = freerate_cmin; c <= freerate_cmax; ++c) {
+              candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, c);
+            }
+            break;
+          case RateHeterogeneityType::GAMMA:
+          case RateHeterogeneityType::INVARIANT_GAMMA:
+            candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity, gamma_category_count);
+            break;
+          default:
+            candidate_models.emplace_back(dt, subst_model, frequency_type, rate_heterogeneity);
+            break;
         }
       }
     }
@@ -126,7 +131,8 @@ ModelTest::ModelTest(const Options &original_options, const PartitionedMSA &msa,
 
 const vector<Model>& ModelTest::optimize_model()
 {
-  if (options.log_level == LogLevel::debug && !options.outfile_prefix.empty()) {
+  if (options.log_level == LogLevel::debug && !options.outfile_prefix.empty())
+  {
     thread_log.reset(new std::ofstream(options.outfile_prefix + ".raxml.modeltest.rank" +
                                        std::to_string(ParallelContext::rank_id()) + ".thread" +
                                        std::to_string(ParallelContext::thread_id()) + ".log"));
@@ -205,7 +211,7 @@ const vector<Model>& ModelTest::optimize_model()
         const auto equivalent_reference = model_scheduler.get_by_descriptor(equivalent_reference_descriptor);
         const bool rhas_copied = evaluator->copy_rhas_parameters(equivalent_reference);
         if (rhas_copied) {
-            LOG_THREAD_TS << " copied RHAS parameters from reference, model parameters: " << evaluator->get_result().model.to_string(true) << endl;
+          LOG_THREAD_TS << " copied RHAS parameters from reference, model parameters: " << evaluator->get_result().model.to_string(true) << endl;
         }
     }
 
@@ -215,7 +221,8 @@ const vector<Model>& ModelTest::optimize_model()
     optimizer.optimize_model(treeinfo);
     evaluator->barrier();
 
-    if (evaluator->thread_id() == 0) {
+    if (evaluator->thread_id() == 0)
+    {
       // Retrieve values from optimized partition.
       // The partition id is always 0, since our treeinfo only contains a single partition
       Model optimized_model(model.to_string());
@@ -254,12 +261,14 @@ const vector<Model>& ModelTest::optimize_model()
     model_scheduler.fetch_global_results();
   }
 
-  if (ParallelContext::master()) {
+  if (ParallelContext::master())
+  {
     best_model_per_part.clear();
 
     LOG_INFO << endl << "Best model(s):" << endl;
     const auto results = model_scheduler.collect_finished_results_by_partition();
-    for (auto p = 0U; p < msa.part_count(); ++p) {
+    for (auto p = 0U; p < msa.part_count(); ++p)
+    {
       auto bic_ranking = rank_by_score(results.at(p));
       const auto &best_model = results.at(p).at(bic_ranking.at(0));
       logger().logstream(LogLevel::result, LogScope::thread)
