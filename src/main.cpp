@@ -667,13 +667,13 @@ bool check_msa(RaxmlInstance& instance)
     }
   }
 
-  if (!seqs_to_remove.empty())
-    parted_msa.remove_taxa(seqs_to_remove);
-
   if (!instance.opts.nofiles_mode && (msa_corrected || !parted_msa_view.identity()))
   {
     print_reduced_msa(instance, parted_msa_view);
   }
+
+  if (!seqs_to_remove.empty())
+    parted_msa.remove_taxa(seqs_to_remove);
 
   if (!parted_msa_view.taxon_name_map().empty())
   {
@@ -1037,8 +1037,8 @@ void check_options_perf(RaxmlInstance& instance)
 {
   const auto& opts = instance.opts;
 
-  /* check that we have enough patterns per thread */
-  if (opts.safety_checks.isset(SafetyCheck::perf_threads))
+  /* check that we have enough patterns per thread - disabled in model selection mode  */
+  if (opts.safety_checks.isset(SafetyCheck::perf_threads) && !opts.auto_model())
   {
     if (ParallelContext::master_rank() && ParallelContext::num_procs() > 1)
     {
