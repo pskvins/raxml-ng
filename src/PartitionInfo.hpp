@@ -57,7 +57,11 @@ public:
   PartitionInfo (const std::string &name, const PartitionStats &stats,
                  const Model &model, const std::string &range_string = "") :
     _name(name), _range_string(range_string), _model(model), _msa(),
-    _stats(stats) {};
+    _stats(stats)
+  {
+    /* if model has empirical params (eg +FC), initialize them with values from stats */
+    set_model_empirical_params();
+  };
 
   virtual ~PartitionInfo ();
 

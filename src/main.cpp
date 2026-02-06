@@ -3843,6 +3843,9 @@ void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
       }
     }
 
+    /* IMPORTANT: update empirical params from MSA, eg freqs for +FC models */
+    instance.parted_msa->set_model_empirical_params();
+
     cm.update_models(instance.parted_msa->models());
   }
   ParallelContext::global_barrier();
