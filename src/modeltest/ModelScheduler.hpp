@@ -40,6 +40,9 @@ class ModelScheduler final {
         void print_xml(std::ostream &os) const;
 
         const SubstitutionModelDescriptor &get_reference_model();
+
+        static vector<size_t> determine_acceptable_thread_counts(size_t total_cores);
+        static size_t pick_acceptable_thread_count(const vector<size_t> &acceptable_thread_counts, size_t requested_thread_count);
 private:
     std::mutex mutex_evaluation;
     std::mutex mutex_log;

@@ -40,24 +40,28 @@ EvaluationPriority prioritize_candidate_model(const ModelDescriptor &candidate_m
 vector<ModelEvaluator> build_evaluators(const PartitionedMSA &msa,
                                         const Options &options,
                                         const SubstitutionModelDescriptor &reference_model,
-                                        ResourceEstimatorFunction resource_estimator,
+                                        const ResourceEstimatorFunction& resource_estimator,
                                         const std::vector<ModelDescriptor> &candidate_models,
                                         unsigned int partition_count)
 {
   vector<ModelEvaluator> evaluators;
   evaluators.reserve(candidate_models.size() * partition_count);
 
+  auto acceptable_thread_counts = ModelScheduler::determine_acceptable_thread_counts(options.num_threads_max);
+
   for (unsigned int p = 0; p < partition_count; ++p)
   {
     const auto &pinfo = msa.part_info(p);
-    for (unsigned int i = 0; i < candidate_models.size(); ++i)
-    {
-      const auto &candidate_model = candidate_models.at(i);
-      const auto priority = prioritize_candidate_model(candidate_model, reference_model);
-      const auto thread_count = CORAX_MIN(resource_estimator(options, pinfo, candidate_model, priority),
-                                          options.num_threads_max);
 
-      evaluators.emplace_back(candidate_model, pinfo.stats(), p, priority, thread_count);
+    for (const auto & candidate_model : candidate_models)
+    {
+      const auto priority = prioritize_candidate_model(candidate_model, reference_model);
+      const auto requested_thread_count = CORAX_MAX(1, resource_estimator(options, pinfo, candidate_model, priority));
+      const auto assigned_thread_count = ModelScheduler::pick_acceptable_thread_count(acceptable_thread_counts, requested_thread_count);
+      
+      LOG_DEBUG << "Candidate model " << candidate_model.descriptor() << " requested " << requested_thread_count << " threads, assigning " << assigned_thread_count << "\n";
+
+      evaluators.emplace_back(candidate_model, pinfo.stats(), p, priority, assigned_thread_count);
     }
   }
 
@@ -119,7 +123,7 @@ ModelScheduler::ModelScheduler(
    candidate_models{std::move(_candidate_models)},
    reference_model{candidate_models.at(0).substitution_model},
    evaluation_index{0},
-   evaluators{build_evaluators(msa, options, reference_model, std::move(resource_estimator),
+   evaluators{build_evaluators(msa, options, reference_model, resource_estimator,
                                candidate_models, partition_count)},
    heuristics{partition_count, options.modeltest_heuristics, get_selected_rhas(candidate_models, reference_model),
               reference_model, options.free_rate_min_categories, options.free_rate_max_categories,
@@ -127,11 +131,19 @@ ModelScheduler::ModelScheduler(
    distributed_scheduling{determine_binary_candidates_size(evaluators)},
    candidate_model_descriptor_width(max_descriptor_width(candidate_models.cbegin(), candidate_models.cend()))
 {
-  std::stable_sort(evaluators.begin(), evaluators.end(),
-              [](const ModelEvaluator &a, const ModelEvaluator &b) {
-                  // Sort by priority, high priority should come first
-                  return a.priority() > b.priority();
-              });
+  {
+    std::stable_sort(evaluators.begin(), evaluators.end(),
+                [](const ModelEvaluator &a, const ModelEvaluator &b) {
+                    // Sort by priority, high priority should come first
+                    return a.priority() > b.priority();
+                });
+    // Sort candidates with priority normal or lower (i.e. non-reference models) by proposed thread count
+    auto after_reference = std::find_if(evaluators.begin(), evaluators.end(),
+                                        [](const ModelEvaluator &a) {return a.priority() <= EvaluationPriority::NORMAL;});
+    std::stable_sort(after_reference, evaluators.end(), [](const ModelEvaluator &a, const ModelEvaluator &b) {
+            return a.proposed_thread_count() > b.proposed_thread_count();
+        });
+  }
 
   for (auto i = 0UL; i < evaluators.size(); ++i)
   {
@@ -409,4 +421,38 @@ ModelEvaluator *ModelScheduler::get_by_descriptor(const PartitionCandidateModel 
 const SubstitutionModelDescriptor &ModelScheduler::get_reference_model()
 {
   return reference_model;
+}
+
+
+vector<size_t> ModelScheduler::determine_acceptable_thread_counts(size_t total_cores) {
+    // Build a sorted list of divisors of processor count
+    vector<size_t> acceptable_thread_counts {total_cores};
+
+    if (total_cores == 0) {
+        throw runtime_error("total core count is 0");
+    }
+
+    while (acceptable_thread_counts.back() != 1) {
+        acceptable_thread_counts.push_back(acceptable_thread_counts.back() / 2);
+    }
+    std::reverse(acceptable_thread_counts.begin(), acceptable_thread_counts.end());
+
+    return acceptable_thread_counts;
+}
+
+size_t ModelScheduler::pick_acceptable_thread_count(const vector<size_t> &acceptable_thread_counts, size_t requested_thread_count) {
+    if (requested_thread_count == 1 || acceptable_thread_counts.empty()) {
+        return requested_thread_count;
+    }
+
+    auto lower_bound = std::lower_bound(acceptable_thread_counts.cbegin(),
+                                        acceptable_thread_counts.cend(),
+                                        requested_thread_count);
+
+    if (lower_bound != acceptable_thread_counts.cend() && *lower_bound == requested_thread_count) {
+        return requested_thread_count;
+    } else {
+        --lower_bound;
+        return *lower_bound;
+    }
 }

@@ -1,13 +1,20 @@
 #include "RaxmlTest.hpp"
 #include "src/modeltest/Heuristics.hpp"
 #include "src/types.hpp"
+#include "gmock/gmock.h"
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <src/modeltest/FreerateHeuristic.hpp>
 #include <src/modeltest/ModelDefinitions.hpp>
 
-#include <src/modeltest/ModelTest.hpp>
-#include <src/modeltest/RHASHeuristic.hpp>
+#include "src/modeltest/ModelTest.hpp"
+#include "src/modeltest/ModelScheduler.hpp"
+#include "src/modeltest/RHASHeuristic.hpp"
 #include <regex>
+#include <stdexcept>
+
+
+using namespace testing;
 
 ModelDescriptor C(const std::string &s, const DataType datatype = DataType::dna) {
     const static std::regex exp(R"(^([^+]+)(\+FC?|\+FO|)(|\+E|\+I|\+G|\+I\+G|\+R|\+I\+R)(\d+|)$)");
@@ -311,4 +318,29 @@ TEST(ICModelTest, HeuristicsII)
     EXPECT_TRUE(h.can_skip(0, Cp("MTREV+FC+I")));
     EXPECT_FALSE(h.can_skip(0, Cp("DCMUT+FC+G4")));
     EXPECT_FALSE(h.can_skip(0, Cp("DAYHOFF+FC+I+G4")));
+}
+
+TEST(ICModelTest, AcceptableThreadCounts)
+{
+    EXPECT_THROW(ModelScheduler::determine_acceptable_thread_counts(0), runtime_error);
+    EXPECT_THAT(ModelScheduler::determine_acceptable_thread_counts(1), ElementsAre(1));
+    EXPECT_THAT(ModelScheduler::determine_acceptable_thread_counts(2), ElementsAre(1, 2));
+    EXPECT_THAT(ModelScheduler::determine_acceptable_thread_counts(3), ElementsAre(1, 3));
+    EXPECT_THAT(ModelScheduler::determine_acceptable_thread_counts(8), ElementsAre(1, 2, 4, 8));
+    EXPECT_THAT(ModelScheduler::determine_acceptable_thread_counts(14), ElementsAre(1, 3, 7, 14));
+    EXPECT_THAT(ModelScheduler::determine_acceptable_thread_counts(256), ElementsAre(1, 2, 4, 8, 16, 32, 64, 128, 256));
+    EXPECT_THAT(ModelScheduler::determine_acceptable_thread_counts(9), ElementsAre(1, 2, 4, 9));
+
+    auto case1 = ModelScheduler::determine_acceptable_thread_counts(16);
+
+    EXPECT_THAT(ModelScheduler::pick_acceptable_thread_count(case1, 1), 1);
+    EXPECT_THAT(ModelScheduler::pick_acceptable_thread_count(case1, 3), 2);
+    EXPECT_THAT(ModelScheduler::pick_acceptable_thread_count(case1, 6), 4);
+    EXPECT_THAT(ModelScheduler::pick_acceptable_thread_count(case1, 8), 8);
+    EXPECT_THAT(ModelScheduler::pick_acceptable_thread_count(case1, 900), 16);
+
+    auto case2 = ModelScheduler::determine_acceptable_thread_counts(9);
+    EXPECT_THAT(ModelScheduler::pick_acceptable_thread_count(case2, 3), 2);
+    EXPECT_THAT(ModelScheduler::pick_acceptable_thread_count(case2, 6), 4);
+    EXPECT_THAT(ModelScheduler::pick_acceptable_thread_count(case2, 9), 9);
 }
