@@ -3998,6 +3998,8 @@ void master_main(RaxmlInstance& instance, CheckpointManager& cm)
     modeltest_thread_main();
     ParallelContext::finalize_threads();
 
+    LOG_INFO << "Model selection time: " << FMT_PREC3(global_timer().elapsed_seconds()) << " seconds\n\n";
+
     /* save updated RBA with best-fit model */
     write_binary_msa_file(instance, true);
   }

@@ -211,7 +211,8 @@ const vector<Model>& ModelTest::optimize_model()
         const auto equivalent_reference = model_scheduler.get_by_descriptor(equivalent_reference_descriptor);
         const bool rhas_copied = evaluator->copy_rhas_parameters(equivalent_reference);
         if (rhas_copied) {
-          LOG_THREAD_TS << " copied RHAS parameters from reference, model parameters: " << evaluator->get_result().model.to_string(true) << endl;
+          LOG_THREAD_TS << " copied RHAS parameters from reference, model parameters: "
+                        << evaluator->get_result().model.to_string(true) << endl;
         }
     }
 
