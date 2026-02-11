@@ -112,13 +112,21 @@ void ModelEvaluator::barrier()
 
   if(_thread_id == 0)
   {
-    while(_barrier_counter != _assigned_threads);
+    while(_barrier_counter != _assigned_threads) {
+        #ifdef HAVE_X86INTRIN_H
+        _mm_pause();
+        #endif
+    }
     _barrier_counter = 0;
     _barrier_proceed = !_barrier_proceed;
   }
   else
   {
-    while(_barrier_mycycle == _barrier_proceed);
+    while(_barrier_mycycle == _barrier_proceed) {
+        #ifdef HAVE_X86INTRIN_H
+        _mm_pause();
+        #endif
+    }
     _barrier_mycycle = !_barrier_mycycle;
   }
 }
