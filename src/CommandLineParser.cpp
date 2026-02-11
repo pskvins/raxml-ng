@@ -293,6 +293,22 @@ void CommandLineParser::compute_num_searches(Options &opts)
   }
 }
 
+void CommandLineParser::set_fast_options(Options &opts)
+{
+  opts.topology_opt_method = TopologyOptMethod::simplified;
+  opts.stopping_rule = StoppingRule::kh_mult;
+  opts.use_pythia = false;
+  opts.use_pars_spr = true;
+  opts.free_rate_opt_method = FreerateOptMethod::EM_BRENT;
+  opts.modeltest_rhas_heuristic_mode = RHASHeuristicMode::OnlyOptimalCategoryCount;
+  opts.modeltest_rhas = fast_rate_heterogeneity_selection;
+  if (opts.command == Command::all)
+  {
+    opts.bs_metrics.clear();
+    opts.bs_metrics.insert(BranchSupportMetric::ebg);
+  }
+}
+
 void CommandLineParser::parse_start_trees(Options &opts, const string& arg)
 {
   auto start_trees = split_string(arg, ',');
@@ -1527,23 +1543,15 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
       case 71:
         if (optarg_tree.empty())
           optarg_tree = "pars{1}";
-        opts.topology_opt_method = TopologyOptMethod::simplified;
-        opts.stopping_rule = StoppingRule::kh_mult;
-        opts.use_pythia = false;
-        opts.use_pars_spr = true;
+        set_fast_options(opts);
         break;
-        /* --allfast mode: fast ML tree search + EBG branch supports */
-        case 72:
-          opts.command = Command::all;
-          if (optarg_tree.empty())
-            optarg_tree = "pars{1}";
-          opts.topology_opt_method = TopologyOptMethod::simplified;
-          opts.stopping_rule = StoppingRule::kh_mult;
-          opts.use_pythia = false;
-          opts.use_pars_spr = true;
-          opts.bs_metrics.clear();
-          opts.bs_metrics.insert(BranchSupportMetric::ebg);
-          break;
+      /* --allfast mode: fast ML tree search + EBG branch supports */
+      case 72:
+        opts.command = Command::all;
+        if (optarg_tree.empty())
+          optarg_tree = "pars{1}";
+        set_fast_options(opts);
+        break;
       case 73: /* freerate optimization method */
         if (strcasecmp(optarg, "em-bfgs") == 0) {
           opts.free_rate_opt_method = FreerateOptMethod::EM_BFGS;

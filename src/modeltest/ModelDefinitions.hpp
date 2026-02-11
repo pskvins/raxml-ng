@@ -79,6 +79,11 @@ const RateHeterogeneitySelection default_rate_heterogeneity_selection{
     RateHeterogeneityType::GAMMA,     RateHeterogeneityType::INVARIANT_GAMMA,
 };
 
+const RateHeterogeneitySelection fast_rate_heterogeneity_selection{
+    RateHeterogeneityType::INVARIANT_FREE_RATE, RateHeterogeneityType::INVARIANT_GAMMA,
+    RateHeterogeneityType::UNIFORM,             RateHeterogeneityType::INVARIANT
+};
+
 class RateHeterogeneityDescriptor
 {
 public:
