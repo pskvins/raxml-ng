@@ -241,14 +241,13 @@ void ModelScheduler::update_result(ModelEvaluator &evaluator, ModelEvaluation re
   {
     const auto progress = _collect_progress();
     const auto n_finished = progress.at(static_cast<uint64_t>(EvaluationStatus::FINISHED));
-    const auto n_waiting = progress.at(static_cast<uint64_t>(EvaluationStatus::WAITING));
+    const auto n_total = evaluators.size() - progress.at(static_cast<uint64_t>(EvaluationStatus::SKIPPED));
     const auto width = std::to_string(evaluators.size() + 1).size();
 
     logger().logstream(LogLevel::progress, LogScope::thread) << RAXML_LOG_TIMESTAMP << std::setfill(' ') << "Evaluated model "
-        << "(" << std::setw(width) << n_finished << "/" << std::setw(width) << (n_finished + n_waiting) << ") "
+        << "(" << std::setw(width) << n_finished << "/" << std::setw(width) << n_total << ") "
         << std::setw(candidate_model_descriptor_width) << std::left << evaluator.candidate_model().descriptor() << " " << right
-        << options.ic_name() << " = " << FMT_LH(evaluator.get_result().ic_score)
-        << "\n";
+        << options.ic_name() << " = " << FMT_LH(evaluator.get_result().ic_score) << " with " << evaluator.proposed_thread_count() << " threads\n";
   }
 }
 
