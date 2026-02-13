@@ -31,8 +31,8 @@ class ModelScheduler final {
         void finalize();
         ~ModelScheduler() = default; 
 
-        void update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce = true, bool write_checkpoint = true);
-        void print_results(int partition_index, ModelEvaluation &result);
+        void update_result(ModelEvaluator &evaluator, const ModelEvaluation &result, bool announce = true, bool write_checkpoint = true);
+        void print_results(int partition_index, const ModelEvaluation &result);
         ModelEvaluator *get_next_model(); 
         ModelEvaluator *get_by_descriptor(const PartitionCandidateModel &candidate_model);
         vector<vector<ModelEvaluation const *>> collect_finished_results_by_partition() const;
@@ -67,7 +67,7 @@ private:
     DistributedSchedulingImpl distributed_scheduling;
 
     void _fetch_global_results();
-    void _update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce = true, bool write_checkpoint = true);
+    void _update_result(ModelEvaluator &evaluator, const ModelEvaluation &result, bool announce = true, bool write_checkpoint = true);
     ModelEvaluator &_get_evaluator(size_t index);
 
     using EvaluationStatusCounts = std::array<uint64_t, static_cast<uint64_t>(EvaluationStatus::FINISHED) + 1>;

@@ -276,6 +276,28 @@ BasicBinaryStream& operator>>(BasicBinaryStream &stream,
 }
 
 BasicBinaryStream& operator<<(BasicBinaryStream &stream,
+                              const ModelEvaluation& model_eval)
+{
+  stream << std::make_tuple(std::ref(model_eval.model), ModelBinaryFmt::full);
+  stream << model_eval.loglh;
+  stream << model_eval.ic_score;
+
+  return stream;
+}
+
+BasicBinaryStream& operator>>(BasicBinaryStream &stream,
+                              ModelEvaluation &model_eval)
+{
+  auto mtuple = std::make_tuple(std::ref(model_eval.model), ModelBinaryFmt::full);
+
+  stream >> mtuple;
+  stream >> model_eval.loglh;
+  stream >> model_eval.ic_score;
+
+  return stream;
+}
+
+BasicBinaryStream& operator<<(BasicBinaryStream &stream,
                               const ModelEvaluationMap &model_evaluations)
 {
 

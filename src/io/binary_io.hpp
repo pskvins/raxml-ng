@@ -163,6 +163,12 @@ BasicBinaryStream& operator<<(BasicBinaryStream &stream,
                               const ModelDescriptor& candidate_model);
 BasicBinaryStream& operator>>(BasicBinaryStream &stream,
                               ModelDescriptor& candidate_model);
+
+BasicBinaryStream& operator<<(BasicBinaryStream &stream,
+                              const ModelEvaluation& model_eval);
+BasicBinaryStream& operator>>(BasicBinaryStream &stream,
+                              ModelEvaluation &model_eval);
+
 BasicBinaryStream& operator<<(BasicBinaryStream &stream,
                               const ModelEvaluationMap& model_evaluations);
 BasicBinaryStream& operator>>(BasicBinaryStream &stream,

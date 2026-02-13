@@ -231,10 +231,10 @@ unsigned int ModelScheduler::recommended_thread_count() const
   return std::max(1U, thread_count);
 }
 
-void ModelScheduler::update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint)
+void ModelScheduler::update_result(ModelEvaluator &evaluator, const ModelEvaluation& result, bool announce, bool write_checkpoint)
 {
   std::lock_guard<std::mutex> lock(mutex_evaluation);
-  _update_result(evaluator, std::move(result), announce, write_checkpoint);
+  _update_result(evaluator, result, announce, write_checkpoint);
 
   // Only show progress for new results
   if (write_checkpoint)
@@ -253,12 +253,12 @@ void ModelScheduler::update_result(ModelEvaluator &evaluator, ModelEvaluation re
   }
 }
 
-void ModelScheduler::_update_result(ModelEvaluator &evaluator, ModelEvaluation result, bool announce, bool write_checkpoint)
+void ModelScheduler::_update_result(ModelEvaluator &evaluator, const ModelEvaluation &result, bool announce, bool write_checkpoint)
 {
   // TODO: replace calls to `std::distance` with `index` field inside ModelEvaluator
   const uint64_t index = std::distance(evaluators.data(), std::addressof(evaluator));
 
-  evaluator.store_result(std::move(result));
+  evaluator.store_result(result);
   heuristics.update(evaluator.partition_index(), evaluator.candidate_model(), evaluator.get_result().ic_score);
 
   if (announce) {
@@ -270,7 +270,7 @@ void ModelScheduler::_update_result(ModelEvaluator &evaluator, ModelEvaluation r
   }
 }
 
-void ModelScheduler::print_results(int partition_index, ModelEvaluation &result)
+void ModelScheduler::print_results(int partition_index, const ModelEvaluation &result)
 {
   std::lock_guard<std::mutex> lock(mutex_log);
 
@@ -290,7 +290,7 @@ void ModelScheduler::fetch_global_results()
 void ModelScheduler::_fetch_global_results()
 {
   ModelUpdateCallback callback = [this](uint64_t i, const ModelEvaluation &m) {
-      _update_result(evaluators.at(i), m, false, true);
+     _update_result(evaluators.at(i), m, false, true);
   };
   distributed_scheduling.fetch_results(callback);
 }

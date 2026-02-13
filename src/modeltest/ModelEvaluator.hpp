@@ -43,7 +43,7 @@ public:
   void skip();
 
   /** Store results from a finished computation. */
-  void store_result(ModelEvaluation evaluation);
+  void store_result(const ModelEvaluation &evaluation);
 
   /** Block until the status changes from WAITING to either RUNNING or
    * SKIPPED. May only be called by threads that are part of the team */

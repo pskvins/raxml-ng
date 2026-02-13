@@ -59,12 +59,12 @@ void ModelEvaluator::wait() const
     }
 }
 
-void ModelEvaluator::store_result(ModelEvaluation result)
+void ModelEvaluator::store_result(const ModelEvaluation &result)
 {
   if (status == EvaluationStatus::FINISHED)
       return;
 
-  _result = std::move(result);
+  _result = result;
   status = EvaluationStatus::FINISHED;
 }
 
