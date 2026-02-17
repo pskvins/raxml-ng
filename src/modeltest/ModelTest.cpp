@@ -254,16 +254,16 @@ const vector<Model>& ModelTest::optimize_model()
 
   // sync ALL threads across ALL workers
   const auto t0 = global_timer().elapsed_seconds();
-  ParallelContext::global_barrier();
+  ParallelContext::global_thread_barrier();
+  ParallelContext::global_mpi_barrier();
   const auto t1 = global_timer().elapsed_seconds();
   LOG_THREAD_TS << " final synchronization took " << 1e3 * (t1 - t0) << " milliseconds." << endl;
 
-  if (ParallelContext::local_group_id() == 0 && ParallelContext::group_master_thread()) {
-    model_scheduler.fetch_global_results();
-  }
-
-  if (ParallelContext::master())
+  /* MB: master thread on every MPI rank should collect models -> required for tree search! */
+  if (ParallelContext::master_thread())
   {
+    model_scheduler.fetch_global_results();
+
     best_model_per_part.clear();
 
     LOG_INFO << endl << "Best model(s):" << endl;
@@ -272,9 +272,9 @@ const vector<Model>& ModelTest::optimize_model()
     {
       auto bic_ranking = rank_by_score(results.at(p));
       const auto &best_model = results.at(p).at(bic_ranking.at(0));
-      logger().logstream(LogLevel::result, LogScope::thread)
-          << "Partition #" << p << ": " << best_model->model.to_string() << " (LogLH = " << FMT_LH(best_model->loglh)
-          << "  BIC = " << FMT_LH(best_model->ic_score) << ")" << endl;
+      LOG_RESULT << "Partition #" << p << ": " << best_model->model.to_string()
+                 << " (LogLH = " << FMT_LH(best_model->loglh)
+                 << "  BIC = " << FMT_LH(best_model->ic_score) << ")" << endl;
 
       best_model_per_part.emplace_back(best_model->model);
     }

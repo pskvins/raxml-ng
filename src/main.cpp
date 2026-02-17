@@ -3839,12 +3839,13 @@ void thread_infer_model(RaxmlInstance& instance, CheckpointManager& cm)
   ParallelContext::global_barrier();
   const auto optimal_models = instance.model_test->optimize_model();
 
-  if (ParallelContext::master())
+  if (ParallelContext::master_thread())
   {
     /* in standalone mode, print model testing results to files */
-    if (instance.opts.command == Command::modeltest)
+    if (instance.opts.command == Command::modeltest && ParallelContext::master())
       instance.model_test->print_results_to_file();
 
+    /* apply best-fit model(s) to the partitioned MSA */
     for (unsigned p = 0; p < optimal_models.size(); ++p)
     {
       if (instance.opts.command == Command::modeltest)
