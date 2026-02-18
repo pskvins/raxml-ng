@@ -41,6 +41,19 @@ bool RBAStream::rba_file(const std::string& fname, bool check_version)
   return valid;
 }
 
+uint32_t RBAStream::rba_version(const std::string& fname)
+{
+  BinaryFileStream bos(fname, std::ios::in);
+  RBAHeader header;
+
+  bos >> header;
+
+  bool valid = bos.good() && header.valid();
+
+  return valid ? header.version : 0;
+}
+
+
 RBAStream& operator<<(RBAStream& stream, const PartitionedMSA& part_msa)
 {
   BinaryFileStream bos(stream.fname(), std::ios::out);

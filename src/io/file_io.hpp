@@ -123,6 +123,7 @@ public:
   RBAStream(const std::string& fname) : MSAFileStream(fname) {}
 
   static bool rba_file(const std::string& fname, bool check_version = false);
+  static uint32_t rba_version(const std::string& fname);
 };
 
 class RaxmlPartitionStream : public std::fstream

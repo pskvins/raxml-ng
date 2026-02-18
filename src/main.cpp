@@ -226,6 +226,9 @@ void init_part_info(RaxmlInstance& instance)
   {
     opts.msa_format = FileFormat::binary;
 
+    if (opts.command == Command::sitelh &&  RBAStream::rba_version(opts.msa_file) < 5)
+      throw runtime_error("RBA file version too old and can't be used with --sitelh command.");
+
     if (!opts.model_file.empty() && !opts.auto_model())
     {
       LOG_WARN <<
