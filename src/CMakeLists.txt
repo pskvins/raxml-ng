@@ -124,3 +124,10 @@ endif()
 set_target_properties(raxml_module PROPERTIES PREFIX "")
 
 install(TARGETS raxml_module DESTINATION bin)
+
+# Build convert_profile utility
+add_executable(convert_profile ${PROJECT_SOURCE_DIR}/src/tools/convert_profile.cpp)
+set_target_properties(convert_profile PROPERTIES 
+                      OUTPUT_NAME convert_profile
+                      RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+install(TARGETS convert_profile DESTINATION bin)
