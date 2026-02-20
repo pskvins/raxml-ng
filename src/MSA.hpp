@@ -55,6 +55,9 @@ public:
   ProbVector::const_iterator probs(size_t index, size_t site) const;
   ProbVector::iterator probs(size_t index, size_t site);
 
+  void set_probs(size_t states, ProbVectorList&& probs);
+  const ProbVectorList& all_probs() const { return _probs; }
+
   doubleVector state_freqs() const;
 
   void site_name(size_t index, const std::string& name);

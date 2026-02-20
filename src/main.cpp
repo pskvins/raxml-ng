@@ -751,9 +751,6 @@ void load_msa(RaxmlInstance& instance)
     instance.opts.use_repeats = false;
     instance.opts.safety_checks.unset(SafetyCheck::msa_dups);
     instance.opts.safety_checks.unset(SafetyCheck::msa_allgaps);
-
-    if (parted_msa.part_count() > 1)
-      throw runtime_error("Partitioned probabilistic alignments are not supported yet, sorry...");
   }
   else
     instance.opts.use_prob_msa = false;

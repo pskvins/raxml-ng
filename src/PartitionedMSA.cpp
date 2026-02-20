@@ -106,14 +106,70 @@ void PartitionedMSA::split_msa()
 {
   if (part_count() > 1)
   {
+    const bool is_probabilistic = _full_msa.probabilistic();
+    const size_t num_states = _full_msa.states();
+    const auto& spm = site_part_map();
+    const size_t num_taxa = _full_msa.size();
+    const size_t full_length = _full_msa.length();
+
     /* split MSA into partitions */
     pll_msa_t ** part_msa_list =
-        pllmod_msa_split(_full_msa.pll_msa(), site_part_map().data(), part_count());
+        pllmod_msa_split(_full_msa.pll_msa(), spm.data(), part_count());
+
+    /* if probabilistic, prepare to split probability vectors */
+    std::vector<ProbVectorList> part_probs;
+    std::vector<size_t> part_site_counts;
+
+    if (is_probabilistic)
+    {
+      part_probs.resize(part_count());
+      part_site_counts.resize(part_count(), 0);
+
+      /* count sites per partition */
+      for (size_t site = 0; site < full_length; ++site)
+      {
+        size_t part_idx = spm[site] - 1;
+        part_site_counts[part_idx]++;
+      }
+
+      /* initialize probability vectors for each partition */
+      for (size_t p = 0; p < part_count(); ++p)
+      {
+        part_probs[p].resize(num_taxa);
+        for (size_t t = 0; t < num_taxa; ++t)
+        {
+          part_probs[p][t].resize(part_site_counts[p] * num_states);
+        }
+      }
+
+      /* split probability vectors by site */
+      std::vector<size_t> part_offsets(part_count(), 0);
+      for (size_t site = 0; site < full_length; ++site)
+      {
+        size_t part_idx = spm[site] - 1;
+        size_t part_site = part_offsets[part_idx];
+
+        for (size_t t = 0; t < num_taxa; ++t)
+        {
+          auto src_it = _full_msa.probs(t, site);
+          auto dst_it = part_probs[part_idx][t].begin() + part_site * num_states;
+          std::copy(src_it, src_it + num_states, dst_it);
+        }
+
+        part_offsets[part_idx]++;
+      }
+    }
 
     for (size_t p = 0; p < part_count(); ++p)
     {
       part_msa(p, part_msa_list[p]);
       pll_msa_destroy(part_msa_list[p]);
+
+      /* set probability data for probabilistic alignments */
+      if (is_probabilistic)
+      {
+        _part_list[p].msa().set_probs(num_states, std::move(part_probs[p]));
+      }
     }
     free(part_msa_list);
   }

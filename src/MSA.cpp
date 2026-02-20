@@ -194,6 +194,12 @@ ProbVector::iterator MSA::probs(size_t index, size_t site)
   return _probs.at(index).begin() + site * _states;
 }
 
+void MSA::set_probs(size_t states, ProbVectorList&& probs)
+{
+  _states = states;
+  _probs = std::move(probs);
+}
+
 bool MSA::normalized() const
 {
   if (!probabilistic())
