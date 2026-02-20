@@ -49,7 +49,8 @@ enum class FileFormat
   iphylip,
   vcf,
   catg,
-  binary
+  binary,
+  profile
 };
 
 enum class DataType

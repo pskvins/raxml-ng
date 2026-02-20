@@ -1,6 +1,9 @@
 #include <stdexcept>
 #include <algorithm>
 #include <map>
+#include <fstream>
+#include <sstream>
+#include <vector>
 
 #include "file_io.hpp"
 #include "../Options.hpp"
@@ -271,6 +274,127 @@ CATGStream& operator>>(CATGStream& stream, MSA& msa)
   return stream;
 }
 
+ProfileStream& operator>>(ProfileStream& stream, MSA& msa)
+{
+  const size_t NUM_AA_STATES = 20;
+
+  ifstream fs;
+  fs.open(stream.fname());
+
+  if (!fs.is_open())
+    throw runtime_error("Cannot open profile file: " + stream.fname());
+
+  string line;
+  vector<string> taxon_names;
+  vector<vector<pair<char, vector<double>>>> sequences;
+
+  vector<pair<char, vector<double>>> current_seq;
+  string current_name;
+
+  while (getline(fs, line))
+  {
+    if (line.empty())
+      continue;
+
+    if (line[0] == '>')
+    {
+      if (!current_name.empty())
+      {
+        taxon_names.push_back(current_name);
+        sequences.push_back(std::move(current_seq));
+        current_seq.clear();
+      }
+      current_name = line.substr(1);
+      while (!current_name.empty() &&
+             (current_name.back() == ' ' || current_name.back() == '\t' ||
+              current_name.back() == '\r' || current_name.back() == '\n'))
+        current_name.pop_back();
+    }
+    else
+    {
+      istringstream iss(line);
+      string token;
+      vector<string> tokens;
+
+      while (getline(iss, token, '\t'))
+        tokens.push_back(token);
+
+      if (tokens.size() != NUM_AA_STATES + 1)
+        throw runtime_error("Profile format error: expected " +
+                            to_string(NUM_AA_STATES + 1) +
+                            " columns, got " + to_string(tokens.size()) +
+                            " at line: " + line);
+
+      char consensus = tokens[0].empty() ? '-' : tokens[0][0];
+      vector<double> probs(NUM_AA_STATES);
+
+      for (size_t i = 0; i < NUM_AA_STATES; ++i)
+      {
+        try
+        {
+          probs[i] = stod(tokens[i + 1]);
+        }
+        catch (const exception& e)
+        {
+          throw runtime_error("Profile format error: invalid probability value '" +
+                              tokens[i + 1] + "' at column " + to_string(i + 2));
+        }
+      }
+
+      current_seq.emplace_back(consensus, std::move(probs));
+    }
+  }
+
+  if (!current_name.empty())
+  {
+    taxon_names.push_back(current_name);
+    sequences.push_back(std::move(current_seq));
+  }
+
+  fs.close();
+
+  size_t taxa_count = taxon_names.size();
+  if (taxa_count == 0)
+    throw runtime_error("Profile file contains no sequences!");
+
+  size_t site_count = sequences[0].size();
+  for (size_t i = 1; i < taxa_count; ++i)
+  {
+    if (sequences[i].size() != site_count)
+      throw runtime_error("Profile format error: sequence '" + taxon_names[i] +
+                          "' has " + to_string(sequences[i].size()) +
+                          " sites, expected " + to_string(site_count));
+  }
+
+  LOG_DEBUG << "Profile: taxa: " << taxa_count << ", sites: " << site_count << endl;
+
+  string dummy(site_count, '*');
+  for (size_t i = 0; i < taxa_count; ++i)
+  {
+    msa.append(dummy, taxon_names[i]);
+    LOG_DEBUG << "Profile: taxon " << i << ": " << taxon_names[i] << endl;
+  }
+
+  msa.states(NUM_AA_STATES);
+
+  for (size_t i = 0; i < site_count; ++i)
+  {
+    for (size_t j = 0; j < taxa_count; ++j)
+    {
+      msa[j][i] = sequences[j][i].first;
+
+      auto site_probs = msa.probs(j, i);
+      const auto& probs = sequences[j][i].second;
+      for (size_t k = 0; k < NUM_AA_STATES; ++k)
+      {
+        site_probs[k] = probs[k];
+      }
+    }
+  }
+
+  return stream;
+}
+
 MSA msa_load_from_file(const std::string &filename, const FileFormat format, const Options& opts)
 {
   MSA msa;
@@ -281,7 +405,8 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format, con
                                                 {FileFormat::fasta, "FASTA"},
                                                 {FileFormat::catg, "CATG"},
                                                 {FileFormat::vcf, "VCF"},
-                                                {FileFormat::binary, "RAxML-binary"} };
+                                                {FileFormat::binary, "RAxML-binary"},
+                                                {FileFormat::profile, "PROFILE"} };
 
   auto fmt_begin = msa_formats.cbegin();
   auto fmt_end = msa_formats.cend();
@@ -342,6 +467,13 @@ MSA msa_load_from_file(const std::string &filename, const FileFormat format, con
         case FileFormat::catg:
         {
           CATGStream s(filename);
+          s >> msa;
+          return msa;
+          break;
+        }
+        case FileFormat::profile:
+        {
+          ProfileStream s(filename);
           s >> msa;
           return msa;
           break;

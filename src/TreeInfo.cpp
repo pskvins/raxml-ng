@@ -662,6 +662,12 @@ void set_partition_tips(const Options& opts, const MSA& msa, const IDVector& tip
   if (!msa.weights().empty())
     pll_set_pattern_weights(partition, msa.weights().data() + part_region.start);
 
+  LOG_DEBUG << "set_partition_tips: use_prob_msa=" << opts.use_prob_msa
+            << ", msa.probabilistic()=" << msa.probabilistic()
+            << ", msa.states()=" << msa.states()
+            << ", part_region.start=" << part_region.start
+            << ", part_region.length=" << part_region.length << std::endl;
+
   if (opts.use_prob_msa && msa.probabilistic())
   {
     assert(!(partition->attributes & PLL_ATTRIB_PATTERN_TIP));

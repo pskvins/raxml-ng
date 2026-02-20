@@ -64,6 +64,12 @@ public:
   CATGStream(const std::string& fname) : MSAFileStream(fname) {}
 };
 
+class ProfileStream : public MSAFileStream
+{
+public:
+  ProfileStream(const std::string& fname) : MSAFileStream(fname) {}
+};
+
 
 enum class VCFLikelihoodMode
 {
@@ -187,6 +193,7 @@ NewickStream& operator<<(NewickStream& stream, const SupportTree& tree);
 PhylipStream& operator>>(PhylipStream& stream, MSA& msa);
 FastaStream& operator>>(FastaStream& stream, MSA& msa);
 CATGStream& operator>>(CATGStream& stream, MSA& msa);
+ProfileStream& operator>>(ProfileStream& stream, MSA& msa);
 
 #ifdef _RAXML_VCF
 VCFStream& operator>>(VCFStream& stream, MSA& msa);

@@ -520,6 +520,10 @@ void CommandLineParser::parse_options(int argc, char** argv, Options &opts)
         {
           opts.msa_format = FileFormat::binary;
         }
+        else if (strcasecmp(optarg, "profile") == 0)
+        {
+          opts.msa_format = FileFormat::profile;
+        }
         else
         {
           throw InvalidOptionValueException("Unknown MSA file format: " + string(optarg));
@@ -927,7 +931,7 @@ void CommandLineParser::print_help()
             "  --tree            rand{N} | pars{N} | FILE starting tree: rand(om), pars(imony) or user-specified (newick file)\n"
             "                                             N = number of trees (default: rand{10},pars{10})\n"
             "  --msa             FILE                     alignment file\n"
-            "  --msa-format      VALUE                    alignment file format: FASTA, PHYLIP, VCF/BCF, CATG or AUTO-detect (default)\n"
+            "  --msa-format      VALUE                    alignment file format: FASTA, PHYLIP, VCF/BCF, CATG, PROFILE or AUTO-detect (default)\n"
             "  --data-type       VALUE                    data type: DNA, AA, BIN(ary) or AUTO-detect (default)\n"
             "  --tree-constraint FILE                     constraint tree\n"
             "  --prefix          STRING                   prefix for output files (default: MSA file name)\n"
