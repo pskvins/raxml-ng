@@ -4,3 +4,7 @@
 [submodule "libs/terraphast"]
 	path = libs/terraphast
 	url = https://github.com/amkozlov/terraphast-one
+[submodule "ProtProfileMD"]
+	path = ProtProfileMD
+	url = https://github.com/finnlueth/ProtProfileMD.git
+	branch = main
