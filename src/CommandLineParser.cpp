@@ -960,7 +960,7 @@ void CommandLineParser::print_help()
             "                 nr_oldfast | nr_oldsafe     \n"
             "  --opt-model    on | off                    ML optimization of all model parameters (default: ON)\n"
             "  --opt-branches on | off                    ML optimization of all branch lengths (default: ON)\n"
-            "  --prob-msa     on | off                    use probabilistic alignment (works with CATG and VCF)\n"
+            "  --prob-msa     on | off                    use probabilistic alignment (works with CATG, VCF and PROFILE)\n"
             "  --lh-epsilon   VALUE                       log-likelihood epsilon for optimization/tree search (default: 0.1)\n"
             "\n"
             "Topology search options:\n"
